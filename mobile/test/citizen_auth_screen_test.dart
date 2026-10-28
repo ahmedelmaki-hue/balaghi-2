@@ -20,7 +20,7 @@ void main() {
             body: TextButton(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const CitizenAuthScreen(),
+                  builder: (_) => const CitizenAuthScreen(previewMode: true),
                 ),
               ),
               child: const Text('open'),

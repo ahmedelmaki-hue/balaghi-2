@@ -6,8 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'onboarding_screen.dart';
 import 'public_map_screen.dart';
 
-// Temporary design-review mode. Change to false to restore first-launch behavior.
-const _showOnboardingEveryLaunch = true;
+// Onboarding shows on the first launch only. Set to true while reviewing its
+// design to show it on every launch.
+const _showOnboardingEveryLaunch = false;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

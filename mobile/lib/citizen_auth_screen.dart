@@ -21,7 +21,10 @@ const _welcomeDark = Color(0xFF0B0F17);
 const _welcomeMuted = Color(0xFF94A3B8);
 
 class CitizenAuthScreen extends StatefulWidget {
-  const CitizenAuthScreen({super.key});
+  const CitizenAuthScreen({super.key, this.previewMode = authPreviewMode});
+
+  /// Walks through the login screens without contacting the server.
+  final bool previewMode;
 
   @override
   State<CitizenAuthScreen> createState() => _CitizenAuthScreenState();
@@ -131,7 +134,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       _error = null;
     });
     try {
-      if (!authPreviewMode) await _api.sendOtp(phone);
+      if (!widget.previewMode) await _api.sendOtp(phone);
       if (!mounted) return;
       _phone = phone;
       _codeController.clear();
@@ -152,7 +155,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       _error = null;
     });
     try {
-      if (!authPreviewMode) await _api.sendOtp(_phone!);
+      if (!widget.previewMode) await _api.sendOtp(_phone!);
       if (!mounted) return;
       _codeController.clear();
       setState(() => _verified = false);
@@ -160,7 +163,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            authPreviewMode ? 'تمت اعادة الارسال' : 'أُعيد إرسال الرمز.',
+            widget.previewMode ? 'تمت اعادة الارسال' : 'أُعيد إرسال الرمز.',
           ),
         ),
       );
@@ -178,7 +181,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       setState(() => _error = 'أدخل رمز التحقق المكوّن من 6 أرقام.');
       return;
     }
-    if (authPreviewMode && code != '123456') {
+    if (widget.previewMode && code != '123456') {
       setState(() => _error = 'رمز تحقق خاطئ');
       return;
     }
@@ -187,7 +190,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       _error = null;
     });
     try {
-      if (authPreviewMode) {
+      if (widget.previewMode) {
         await _showVerifiedAnimation();
         if (mounted) _changeStage(_AuthStage.profile);
         return;
@@ -232,7 +235,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       _error = null;
     });
     try {
-      if (authPreviewMode) {
+      if (widget.previewMode) {
         await _previewStore.markCompleted(
           fullName: '$first $last',
           phone: _phone,
@@ -248,7 +251,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => _error = authPreviewMode
+          () => _error = widget.previewMode
               ? 'تعذر حفظ معاينة الدخول. حاول مجددًا.'
               : 'تعذر حفظ جلسة الدخول. حاول مجددًا.',
         );
@@ -518,7 +521,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
           ],
         ),
       ),
-      if (authPreviewMode) ...[const SizedBox(height: 13)],
+      if (widget.previewMode) ...[const SizedBox(height: 13)],
       const SizedBox(height: 72),
       const Center(child: AuthIllustration(scene: AuthIllustrationScene.phone)),
     ],

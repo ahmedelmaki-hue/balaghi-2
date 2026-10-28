@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_maplibre/flutter_map_maplibre.dart';
 import 'package:geolocator/geolocator.dart';
@@ -22,10 +21,9 @@ import 'report_details_screen.dart';
 import 'report_ui.dart';
 
 const _tripoli = LatLng(32.8912, 13.1905);
-const _demoMap = bool.fromEnvironment(
-  'BALAGHI_DEMO_MAP',
-  defaultValue: kDebugMode,
-);
+// Demo markers only when requested with --dart-define=BALAGHI_DEMO_MAP=true;
+// otherwise the map always shows real reports from the API.
+const _demoMap = bool.fromEnvironment('BALAGHI_DEMO_MAP', defaultValue: false);
 const _homeTeal = Color(0xFF12323F);
 const _homeGold = Color(0xFFE5A93C);
 const _homeBorder = Color(0xFFE8E4DA);
