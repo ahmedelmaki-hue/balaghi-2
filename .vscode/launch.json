@@ -23,7 +23,7 @@
       "toolArgs": [
         "--dart-define=BALAGHI_AUTH_PREVIEW=false",
         "--dart-define=BALAGHI_DEMO_MAP=false",
-        "--dart-define=BALAGHI_API_BASE_URL=http://192.168.33.134:5000/api"
+        "--dart-define=BALAGHI_API_BASE_URL=http://192.168.1.165:5000/api"
       ]
     },
     {
