@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgCanvas" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCFAF5" />
+      <stop offset="100%" stop-color="#F5EFE3" />
+    </linearGradient>
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24" />
+      <stop offset="60%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <linearGradient id="navySlate" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    <filter id="goldenGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#F59E0B" flood-opacity="0.35" />
+    </filter>
+    <filter id="smoothShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#0F172A" flood-opacity="0.08" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#D97706" flood-opacity="0.06" />
+    </filter>
+  </defs>
+
+  <rect x="36" y="36" width="440" height="440" rx="110" fill="url(#bgCanvas)" filter="url(#smoothShadow)" />
+  <rect x="36" y="36" width="440" height="440" rx="110" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-opacity="0.9" />
+
+  <g transform="translate(0, -10)">
+    <path d="M 256,110 C 190,110 144,162 144,228 C 144,285 192,345 242,382 C 250.5,388.5 261.5,388.5 270,382 C 320,345 368,285 368,228 C 368,162 322,110 256,110 Z"
+      fill="none" stroke="url(#navySlate)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="256" cy="222" r="38" fill="url(#goldGradient)" filter="url(#goldenGlow)" />
+    <circle cx="256" cy="222" r="14" fill="#FFFFFF" />
+    <path d="M 226,170 C 235,162 245,158 256,158 C 267,158 277,162 286,170"
+      fill="none" stroke="url(#goldGradient)" stroke-width="7" stroke-linecap="round" />
+    <circle cx="256" cy="424" r="15" fill="url(#goldGradient)" filter="url(#goldenGlow)" />
+    <circle cx="256" cy="424" r="21" fill="none" stroke="#FBBF24" stroke-width="2.5" opacity="0.5" />
+  </g>
+</svg>

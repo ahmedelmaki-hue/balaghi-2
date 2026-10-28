@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ربط هاتف Android بخادم بلاغي المحلي",
+      "type": "process",
+      "command": "C:\\Users\\Asus\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe",
+      "args": ["reverse", "tcp:5000", "tcp:5000"],
+      "problemMatcher": []
+    }
+  ]
+}

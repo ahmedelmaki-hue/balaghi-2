@@ -1,0 +1,12 @@
+backend/node_modules/
+dashboard/node_modules/
+dashboard/dist/
+backend/.env
+backend/.env.local
+backend/supabase/.temp/
+backend/uploads/
+*.log
+
+# Build outputs that do not belong in version control
+*.apk
+*.aab
