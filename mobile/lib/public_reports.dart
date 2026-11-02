@@ -115,31 +115,49 @@ class PublicReportsRepository {
   final http.Client _client;
   final bool _ownsClient;
 
+  /// Markers in [bounds], newest first. The API sends at most 500 per batch, so
+  /// this follows `next_cursor` for up to [maxBatches] batches; a view with
+  /// even more reports shows the newest and the rest appear as the citizen
+  /// zooms in.
   Future<List<PublicReport>> fetchMarkers(
     LatLngBounds bounds, {
     ReportCategory? category,
+    int maxBatches = 4,
   }) async {
-    final query = <String, String>{
-      'bbox': '${bounds.west},${bounds.south},${bounds.east},${bounds.north}',
-      'limit': '500',
-      if (category != null) 'category': category.apiValue,
-    };
-    final uri = Uri.parse(
-      '$_baseUrl/reports/public',
-    ).replace(queryParameters: query);
-    final response = await _client
-        .get(uri)
-        .timeout(const Duration(seconds: 12));
-    if (response.statusCode != 200) {
-      throw Exception('تعذر تحميل البلاغات (${response.statusCode})');
+    final reports = <PublicReport>[];
+    String? cursor;
+    for (var batch = 0; batch < maxBatches; batch++) {
+      final query = <String, String>{
+        'bbox': '${bounds.west},${bounds.south},${bounds.east},${bounds.north}',
+        'limit': '500',
+        if (category != null) 'category': category.apiValue,
+        'cursor': ?cursor,
+      };
+      final uri = Uri.parse(
+        '$_baseUrl/reports/public',
+      ).replace(queryParameters: query);
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 12));
+      if (response.statusCode != 200) {
+        throw Exception('تعذر تحميل البلاغات (${response.statusCode})');
+      }
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final items = body['items'] as List<dynamic>? ?? const [];
+      reports.addAll(
+        items.map((item) {
+          final json = Map<String, dynamic>.from(item as Map);
+          json['image_url'] = resolveReportImageUrl(
+            json['image_url'],
+            _baseUrl,
+          );
+          return PublicReport.fromJson(json);
+        }),
+      );
+      cursor = body['next_cursor'] as String?;
+      if (cursor == null) break;
     }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    final items = body['items'] as List<dynamic>? ?? const [];
-    return items.map((item) {
-      final json = Map<String, dynamic>.from(item as Map);
-      json['image_url'] = resolveReportImageUrl(json['image_url'], _baseUrl);
-      return PublicReport.fromJson(json);
-    }).toList();
+    return reports;
   }
 
   Future<PublicReport> fetchDetail(String id) async {

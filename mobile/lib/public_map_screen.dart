@@ -14,6 +14,7 @@ import 'citizen_auth_preview_store.dart';
 import 'citizen_auth_screen.dart';
 import 'create_report_repository.dart';
 import 'create_report_screen.dart';
+import 'marker_clusters.dart';
 import 'my_reports_screen.dart';
 import 'pending_reports.dart';
 import 'public_reports.dart';
@@ -48,6 +49,8 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
   Timer? _refreshTimer;
   bool _mapReady = false;
   bool _userMovedMap = false;
+  // Zoom in half steps: clusters are rebuilt only when this changes.
+  double _clusterZoom = 13.5;
   bool _loading = false;
   int _requestSerial = 0;
   int _selectionSerial = 0;
@@ -359,6 +362,14 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
     );
   }
 
+  void _zoomInto(MarkerCluster cluster) {
+    if (!_mapReady) return;
+    _userMovedMap = true;
+    final zoom = (_mapController.camera.zoom + 2).clamp(5, 18).toDouble();
+    _mapController.move(cluster.center, zoom);
+    _refresh();
+  }
+
   void _zoom(double delta) {
     if (!_mapReady) return;
     _userMovedMap = true;
@@ -605,7 +616,9 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
             unawaited(_locate(initial: true));
           },
           onTap: (_, _) => _clearSelection(),
-          onPositionChanged: (_, hasGesture) {
+          onPositionChanged: (camera, hasGesture) {
+            final zoom = (camera.zoom * 2).round() / 2;
+            if (zoom != _clusterZoom) setState(() => _clusterZoom = zoom);
             if (!hasGesture) return;
             _userMovedMap = true;
             if (_demoMap) return;
@@ -619,19 +632,39 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
           ),
           MarkerLayer(
             markers: [
-              for (final report in _visibleReports)
-                Marker(
-                  point: report.location,
-                  width: _selectedReport?.id == report.id ? 88 : 68,
-                  height: _selectedReport?.id == report.id ? 104 : 80,
-                  alignment: Alignment.bottomCenter,
-                  child: _ReportPin(
-                    key: ValueKey(report.id),
-                    report: report,
-                    selected: _selectedReport?.id == report.id,
-                    onTap: () => _selectReport(report),
+              for (final cluster in clusterReports(
+                _visibleReports,
+                _clusterZoom,
+                keepApart: {?_selectedReport?.id},
+              ))
+                if (cluster.isSingle)
+                  Marker(
+                    point: cluster.center,
+                    width: _selectedReport?.id == cluster.reports.single.id
+                        ? 88
+                        : 68,
+                    height: _selectedReport?.id == cluster.reports.single.id
+                        ? 104
+                        : 80,
+                    alignment: Alignment.bottomCenter,
+                    child: _ReportPin(
+                      key: ValueKey(cluster.reports.single.id),
+                      report: cluster.reports.single,
+                      selected:
+                          _selectedReport?.id == cluster.reports.single.id,
+                      onTap: () => _selectReport(cluster.reports.single),
+                    ),
+                  )
+                else
+                  Marker(
+                    point: cluster.center,
+                    width: 56,
+                    height: 56,
+                    child: _ClusterPin(
+                      count: cluster.reports.length,
+                      onTap: () => _zoomInto(cluster),
+                    ),
                   ),
-                ),
               if (_userLocation != null)
                 Marker(
                   point: _userLocation!,
@@ -1087,6 +1120,46 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _ClusterPin extends StatelessWidget {
+  const _ClusterPin({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: '$count بلاغات متقاربة، اضغط للتكبير',
+    child: InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Center(
+        child: Container(
+          width: count >= 100 ? 52 : 44,
+          height: count >= 100 ? 52 : 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _homeTeal,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: const [
+              BoxShadow(color: Color(0x33000000), blurRadius: 8),
+            ],
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ),
     ),
