@@ -98,4 +98,6 @@ Every response carries `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Po
 npm test
 ```
 
-The automated tests use local fakes for Supabase and PostgreSQL. The free local stack also supports end-to-end checks of citizen OTP, Storage, and SQL. The Flutter app is in [`mobile`](../mobile), and the staff dashboard is in [`dashboard`](../dashboard/README.md).
+The automated tests use local fakes for Supabase and PostgreSQL.
+
+`npm run test:integration` runs the real routes against the real local schema while local Supabase is running: a report from submission to resolution, returning a held report to its agency, field concerns, owners and permissions, and the constraints that must refuse bad writes. Each test runs inside one transaction that is rolled back, so local data stays as it was; report numbers may skip ahead because identity sequences never roll back. The script refuses any database that is not on `localhost`. The free local stack also supports end-to-end checks of citizen OTP, Storage, and SQL. The Flutter app is in [`mobile`](../mobile), and the staff dashboard is in [`dashboard`](../dashboard/README.md).

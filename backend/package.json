@@ -24,7 +24,8 @@
     "supabase:stop:local": "node scripts/local-supabase.js stop",
     "start": "node src/server.js",
     "start:local": "node --require ./scripts/local-env.js src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:integration": "node --require ./scripts/local-env.js --test integration/lifecycle.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",
