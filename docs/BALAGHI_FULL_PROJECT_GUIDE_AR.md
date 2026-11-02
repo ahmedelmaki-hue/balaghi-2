@@ -339,7 +339,11 @@ cd dashboard; npm run build
 | `backend/scripts/create-admin.js` | إنشاء مسؤول رئيسي من الخادم (`admin:create` أو `admin:create:local`). |
 | `backend/src/report_area.js` | مضلع طرابلس المركز والتحقق المكاني للخادم. |
 | `backend/src/storage.js`, `supabase.js`, `db.js` | الصور، Supabase clients، واتصال PostgreSQL. |
-| `dashboard/src/App.jsx` | مكونات وواجهات لوحة الموظف والعامل وسير التنقل. |
+| `dashboard/src/App.jsx` | الإطار: الجلسة، التنقل حسب الدور والصلاحيات، والنوافذ المشتركة. |
+| `dashboard/src/shared.jsx` | التسميات، قواعد الصلاحيات، التنسيق، والمكونات الصغيرة المشتركة. |
+| `dashboard/src/accountScreens.jsx`, `Sidebar.jsx` | الدخول وتغيير كلمة المرور، والقائمة الجانبية. |
+| `dashboard/src/pages/` | صفحات اللوحة: النظرة العامة، قوائم المراجعة، الخريطة، الإحصاءات، صفحة العامل، وصفحات الإدارة. |
+| `dashboard/src/DetailDrawer.jsx` | تفاصيل البلاغ وكل قرارات الموظف عليه. |
 | `dashboard/src/api.js` | استدعاءات API وإدارة الجلسة في اللوحة. |
 | `dashboard/src/reportTimeline.js` | تكوين سجل المراحل المعروض للموظف. |
 | `dashboard/src/CompletionCamera.jsx` | كاميرا وصورة ما بعد الإصلاح. |
