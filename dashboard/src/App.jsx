@@ -5,6 +5,7 @@ import {
 import { fetchMe, logout, restoreSession, staffApi } from './api.js';
 import { navigation, adminNavigation, allowedAdminPages } from './shared.jsx';
 import { Sidebar } from './Sidebar.jsx';
+import { AccountMenu } from './AccountMenu.jsx';
 import { LoginScreen, ForcedPasswordScreen, PasswordModal } from './accountScreens.jsx';
 import { OverviewPage } from './pages/OverviewPage.jsx';
 import { PendingReviewPage, ReportsPage } from './pages/QueuePages.jsx';
@@ -95,7 +96,7 @@ export default function App() {
   const pageTitle = [...navigation, ...allowedAdminPages(user)].find((item) => item.key === page)?.label || 'نظرة عامة';
   return <div className="app-layout">
     <Sidebar page={page} setPage={setPage} user={user} onLogout={leave} onPassword={() => setPasswordOpen(true)} closeMobile={() => setMobileNav(false)} open={mobileNav} queueCounts={queueCounts} />
-    <main className="main-area"><div className="top-strip"><span><span className="online-dot" />نظام بلاغي · {isAdmin ? 'لوحة المسؤول' : 'لوحة الموظف'}</span><div><CalendarDays size={16} />{new Intl.DateTimeFormat('ar-LY', { dateStyle: 'full' }).format(new Date())}<span className="top-user"><UserRound size={17} />{user.full_name || user.staff_username}</span></div></div>
+    <main className="main-area"><div className="top-strip"><span><span className="online-dot" />نظام بلاغي · {isAdmin ? 'لوحة المسؤول' : 'لوحة الموظف'}</span><div><CalendarDays size={16} />{new Intl.DateTimeFormat('ar-LY', { dateStyle: 'full' }).format(new Date())}<AccountMenu user={user} onPassword={() => setPasswordOpen(true)} onLogout={leave} className="top-user"><UserRound size={17} />{user.full_name || user.staff_username}</AccountMenu></div></div>
       <div className="page-container" key={page}>
         {page === 'overview' && <OverviewPage user={user} onOpen={setSelectedId} onNavigate={setPage} refreshKey={refreshKey} onMenu={() => setMobileNav(true)} />}
         {page === 'pending' && <PendingReviewPage onOpen={setSelectedId} refreshKey={refreshKey} onMenu={() => setMobileNav(true)} />}
