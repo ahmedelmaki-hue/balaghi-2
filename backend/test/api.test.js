@@ -907,43 +907,71 @@ test('status changes are transactional and only allow the approved sequence', as
   });
 });
 
-test('repeating a report request does not upload or create another report', async () => {
-  let saved = null;
-  const pool = {
-    async query(sql, params) {
-      if (sql.includes('FROM public.profiles WHERE id')) return { rows: [citizen] };
-      if (sql.includes('client_request_id = $2')) return { rows: saved ? [saved] : [] };
-      if (sql.includes('INSERT INTO public.reports')) {
-        saved = {
-          id: '1', category: 'garbage', description: null, image_path: 'images/test.jpg',
-          latitude: 32.88, longitude: 13.19, address_text: null, status: 'new',
-          created_at: new Date(), updated_at: new Date(),
-        };
-        return { rows: [saved] };
-      }
-      throw new Error(`Unexpected SQL: ${sql}`);
-    },
+// A citizen's reports table: answers the retry lookup, the daily count and the insert.
+function citizenReportsPool({ sentToday = 0 } = {}) {
+  const saved = new Map();
+  const operations = [];
+  const query = async (sql, params) => {
+    operations.push(sql);
+    if (sql.includes('FROM public.profiles WHERE id')) return { rows: [citizen] };
+    if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.includes('pg_advisory_xact_lock')) return { rows: [] };
+    if (sql.includes('client_request_id = $2')) return { rows: saved.has(params[1]) ? [saved.get(params[1])] : [] };
+    if (sql.includes("AT TIME ZONE 'Africa/Tripoli'")) return { rows: [{ total: sentToday + saved.size }] };
+    if (sql.includes('INSERT INTO public.reports')) {
+      const row = {
+        id: String(saved.size + 1), category: params[2], description: null, image_path: params[4],
+        latitude: 32.88, longitude: 13.19, address_text: null, status: 'new',
+        created_at: new Date(), updated_at: new Date(),
+      };
+      saved.set(params[1], row);
+      return { rows: [row] };
+    }
+    throw new Error(`Unexpected SQL: ${sql}`);
   };
-  const storage = fakeStorage();
+  return { query, operations, async connect() { return { query, release() {} }; } };
+}
+
+async function sendReport(base, requestId) {
   const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: 'red' } })
     .png().toBuffer();
+  const form = new FormData();
+  form.set('category', 'garbage');
+  form.set('latitude', '32.88');
+  form.set('longitude', '13.19');
+  form.set('client_request_id', requestId);
+  form.set('image', new Blob([image], { type: 'image/png' }), 'image.png');
+  return jsonRequest(base, '/api/reports', {
+    method: 'POST', headers: { authorization: 'Bearer citizen-token' }, body: form,
+  });
+}
+
+test('repeating a report request does not upload or create another report', async () => {
+  const pool = citizenReportsPool();
+  const storage = fakeStorage();
   const requestId = '33333333-3333-4333-8333-333333333333';
 
   await withServer({ pool, authClientFactory, storage }, async (base) => {
-    async function send() {
-      const form = new FormData();
-      form.set('category', 'garbage');
-      form.set('latitude', '32.88');
-      form.set('longitude', '13.19');
-      form.set('client_request_id', requestId);
-      form.set('image', new Blob([image], { type: 'image/png' }), 'image.png');
-      return jsonRequest(base, '/api/reports', {
-        method: 'POST', headers: { authorization: 'Bearer citizen-token' }, body: form,
-      });
-    }
-    assert.equal((await send()).status, 201);
-    assert.equal((await send()).status, 200);
+    assert.equal((await sendReport(base, requestId)).status, 201);
+    assert.equal((await sendReport(base, requestId)).status, 200);
     assert.equal(storage.uploads, 1);
+    assert.ok(pool.operations.some((sql) => sql.includes('pg_advisory_xact_lock')));
+    assert.ok(pool.operations.includes('COMMIT'));
+  });
+});
+
+test('a citizen can send ten reports a day, and an eleventh is refused before upload', async () => {
+  const pool = citizenReportsPool({ sentToday: 9 });
+  const storage = fakeStorage();
+  const tenth = '44444444-4444-4444-8444-444444444444';
+
+  await withServer({ pool, authClientFactory, storage }, async (base) => {
+    assert.equal((await sendReport(base, tenth)).status, 201);
+    const eleventh = await sendReport(base, '55555555-5555-4555-8555-555555555555');
+    assert.equal(eleventh.status, 429);
+    assert.equal(eleventh.body.error, 'daily report limit reached');
+    assert.equal(storage.uploads, 1);
+    // Resending the tenth report still returns it; the limit only stops new ones.
+    assert.equal((await sendReport(base, tenth)).status, 200);
   });
 });
 

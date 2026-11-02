@@ -2,6 +2,7 @@
 // Run with `npm run test:integration` while local Supabase is running.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
 const { startWorld, reportForm, completionForm, BBOX } = require('./helpers');
 
 async function world() {
@@ -176,6 +177,32 @@ test('the schema refuses what the API must never write', async () => {
     await reject(`INSERT INTO public.field_issue_reviews (report_id, worker_id, reason, note, decision, decided_by, decided_at)
       VALUES ($1, $2, 'other', 'ملاحظة', 'reassign', $2, NOW())`, [id, w.people.worker.id]);
     await reject(`UPDATE public.reports SET work_started_at = NOW() WHERE id = $1`, [id]);
+  } finally {
+    await w.stop();
+  }
+});
+
+test('a citizen sends ten reports a Tripoli day, and yesterday does not count', async () => {
+  const w = await world();
+  try {
+    const send = async (requestId) => w.call('citizen-token', '/reports', { method: 'POST', form: await reportForm({ requestId }) });
+    const sent = [];
+    for (let i = 0; i < 10; i += 1) {
+      const requestId = randomUUID();
+      const created = await send(requestId);
+      assert.equal(created.status, 201, JSON.stringify(created.body));
+      sent.push({ requestId, id: created.body.id });
+    }
+    const eleventh = await send(randomUUID());
+    assert.equal(eleventh.status, 429);
+    assert.equal(eleventh.body.error, 'daily report limit reached');
+    const retry = await send(sent[9].requestId);
+    assert.equal(retry.status, 200);
+    assert.equal(retry.body.id, sent[9].id);
+
+    await w.db.query(`UPDATE public.reports SET created_at = created_at - INTERVAL '1 day'
+      WHERE user_id = $1`, [w.people.citizen.id]);
+    assert.equal((await send(randomUUID())).status, 201);
   } finally {
     await w.stop();
   }

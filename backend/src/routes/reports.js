@@ -27,6 +27,12 @@ const REJECTION_REASON = `(SELECT h.change_reason FROM public.status_history h
   WHERE h.report_id = r.id AND h.new_status = 'rejected'
   ORDER BY h.changed_at DESC, h.id DESC LIMIT 1) AS rejection_reason`;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Reports one citizen may send per calendar day in Tripoli. Every sent report counts,
+// rejected ones included; resending the same request returns it and costs nothing.
+const DAILY_REPORT_LIMIT = 10;
+const SENT_TODAY = `SELECT COUNT(*)::int AS total FROM public.reports
+  WHERE user_id = $1
+    AND created_at >= (date_trunc('day', NOW() AT TIME ZONE 'Africa/Tripoli') AT TIME ZONE 'Africa/Tripoli')`;
 const MAX_REPORT_ID = 9_223_372_036_854_775_807n;
 const FIELD_ISSUE_REASONS = ['not_found', 'wrong_location', 'duplicate', 'inaccessible', 'other'];
 const VERIFICATION_RESULTS = ['exists', 'wrong_location', 'not_found', 'unable'];
@@ -435,20 +441,39 @@ function createReportsRouter({ pool, auth, storage }) {
     }
     if (!req.file) throw new HttpError(400, 'image required');
 
-    const existing = await pool.query(
+    const findSent = (db) => db.query(
       `SELECT ${REPORT_COLUMNS} FROM public.reports r
        WHERE r.user_id = $1 AND r.client_request_id = $2`,
       [req.user.id, clientRequestId]
     );
+    const existing = await findSent(pool);
     if (existing.rows[0]) {
       return res.json((await storage.withSignedImages(existing.rows))[0]);
+    }
+    // Checked before the upload so a citizen at the limit stores nothing.
+    if ((await pool.query(SENT_TODAY, [req.user.id])).rows[0].total >= DAILY_REPORT_LIMIT) {
+      throw new HttpError(429, 'daily report limit reached');
     }
 
     const imageBuffer = await prepareImage(req.file);
     const imagePath = await storage.upload(req.user.id, imageBuffer);
+    const client = await pool.connect();
     let created;
     try {
-      const result = await pool.query(
+      await client.query('BEGIN');
+      // One citizen's submissions take turns here, so two sent together
+      // cannot both pass the count, and a retry finds the report its twin saved.
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))', [req.user.id]);
+      const twin = await findSent(client);
+      if (twin.rows[0]) {
+        await client.query('ROLLBACK');
+        await storage.remove(imagePath);
+        return res.json((await storage.withSignedImages(twin.rows))[0]);
+      }
+      if ((await client.query(SENT_TODAY, [req.user.id])).rows[0].total >= DAILY_REPORT_LIMIT) {
+        throw new HttpError(429, 'daily report limit reached');
+      }
+      const result = await client.query(
         `INSERT INTO public.reports
          (user_id, client_request_id, category, description, image_path,
           latitude, longitude, address_text)
@@ -458,18 +483,14 @@ function createReportsRouter({ pool, auth, storage }) {
         [req.user.id, clientRequestId, category, description?.trim() || null,
           imagePath, lat, lng, addressText?.trim() || null]
       );
+      await client.query('COMMIT');
       created = result.rows[0];
     } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
       await storage.remove(imagePath);
-      if (error.code === '23505' && error.constraint === 'reports_retry_unique') {
-        const retry = await pool.query(
-          `SELECT ${REPORT_COLUMNS} FROM public.reports r
-           WHERE r.user_id = $1 AND r.client_request_id = $2`,
-          [req.user.id, clientRequestId]
-        );
-        if (retry.rows[0]) return res.json((await storage.withSignedImages(retry.rows))[0]);
-      }
       throw error;
+    } finally {
+      client.release();
     }
     res.status(201).json((await storage.withSignedImages([created]))[0]);
   }));

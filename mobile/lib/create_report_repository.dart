@@ -9,6 +9,10 @@ import 'citizen_auth.dart';
 import 'public_reports.dart';
 import 'report_image_url.dart';
 
+/// Shown when the server refuses an eleventh report on the same day.
+const dailyReportLimitMessage =
+    'وصلت إلى الحد اليومي: 10 بلاغات في اليوم. يمكنك إرسال بلاغ جديد غدًا.';
+
 class CreateReportFailure implements Exception {
   const CreateReportFailure(this.message, {this.canRetryLater = false});
   final String message;
@@ -83,6 +87,9 @@ class CreateReportRepository {
       throw const CreateReportFailure(
         'موقع البلاغ خارج النطاق المحدد. اختر موقعًا داخل حدود طرابلس المركز.',
       );
+    }
+    if (response.statusCode == 429) {
+      throw const CreateReportFailure(dailyReportLimitMessage);
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw CreateReportFailure(

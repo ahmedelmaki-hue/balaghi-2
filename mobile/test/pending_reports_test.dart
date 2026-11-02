@@ -177,6 +177,11 @@ void main() {
     final suspended = await failure(http.Response('', 403));
     expect(suspended.canRetryLater, isFalse);
     expect(suspended.message, suspendedAccountMessage);
+    final dailyLimit = await failure(
+      http.Response('{"error":"daily report limit reached"}', 429),
+    );
+    expect(dailyLimit.canRetryLater, isFalse);
+    expect(dailyLimit.message, dailyReportLimitMessage);
   });
 
   test('an offline session refresh keeps the citizen signed in', () async {
