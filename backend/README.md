@@ -78,6 +78,20 @@ Every administrative action and password change is recorded in `public.admin_aud
 
 The older local-only `npm run worker:create:local` still works for quick demo workers. Accounts created by SQL as described in earlier versions keep working; new accounts should come from the dashboard.
 
+## Deploy
+
+The local setup uses HTTP, a fixed test OTP and an in-memory rate limiter. Before real users:
+
+1. **HTTPS.** Serve the API and the dashboard over HTTPS only, for example behind nginx, Caddy or a hosting platform. The API sends HSTS when it sees an HTTPS request. Behind a proxy, set `TRUST_PROXY=1` so the rate limits count each visitor's address instead of the proxy's.
+2. **CORS.** Set `CORS_ORIGINS` to the dashboard's exact origin (for example `https://dashboard.example.ly`). With `NODE_ENV=production` and no origins, the API warns at start. The Flutter app does not need CORS.
+3. **Supabase.** Use a hosted project with the full schema from `docs/ERD.sql`, a private `report-images` bucket, phone sign-in through a real SMS provider, and no `test_otp` numbers. Keep `SUPABASE_SECRET_KEY` and `DATABASE_URL` only in the server's environment.
+4. **Dashboard.** Build with `VITE_API_BASE_URL=https://api.example.ly/api npm run build` and serve `dashboard/dist` as static files. Every unknown path must return `index.html`.
+5. **Citizen app.** Build a release APK with `--dart-define=BALAGHI_API_BASE_URL=https://api.example.ly/api`. Release builds refuse plain HTTP, which is intended.
+6. **Accounts.** Create owners with `npm run admin:create`, and give each employee their own account.
+7. **Rate limits.** They are kept in the memory of one API process. If you run several instances, add a limit at the proxy as well.
+
+Every response carries `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and a restrictive `Content-Security-Policy`. The API only answers JSON and images.
+
 ## Check
 
 ```powershell

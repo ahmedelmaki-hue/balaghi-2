@@ -1,5 +1,14 @@
 require('dotenv').config();
 
+// "1" trusts one proxy hop, "true" every hop, anything else is passed to Express
+// as a subnet list (for example "loopback").
+function parseTrustProxy(value) {
+  if (!value) return false;
+  if (/^\d+$/.test(value)) return Number(value);
+  if (value === 'true') return true;
+  return value;
+}
+
 function loadConfig(env = process.env) {
   const config = {
     port: Number(env.PORT || 5000),
@@ -10,6 +19,7 @@ function loadConfig(env = process.env) {
     storageBucket: env.SUPABASE_STORAGE_BUCKET || 'report-images',
     // Domain of the internal Auth emails behind staff usernames; never shown to staff.
     staffEmailDomain: (env.STAFF_EMAIL_DOMAIN || 'balaghi.local').toLowerCase(),
+    trustProxy: parseTrustProxy(env.TRUST_PROXY),
     corsOrigins: (env.CORS_ORIGINS || '').split(',').map((origin) => origin.trim()).filter(Boolean),
   };
 

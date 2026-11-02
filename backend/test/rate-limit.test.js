@@ -46,3 +46,28 @@ test('repeated staff sign-in attempts for one username are refused with 429', as
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('every API response carries security headers and no framework banner', async () => {
+  const server = createApp({ pool: {}, authClientFactory: () => ({}), storage: {}, authAdmin: {} })
+    .listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('x-frame-options'), 'DENY');
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.match(response.headers.get('content-security-policy'), /default-src 'none'/);
+    assert.equal(response.headers.get('x-powered-by'), null);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('TRUST_PROXY accepts a hop count, true, or a subnet list', () => {
+  const { loadConfig } = require('../src/config');
+  const base = { DATABASE_URL: 'postgres://x', SUPABASE_URL: 'http://x', SUPABASE_PUBLISHABLE_KEY: 'p', SUPABASE_SECRET_KEY: 's' };
+  assert.equal(loadConfig({ ...base }).trustProxy, false);
+  assert.equal(loadConfig({ ...base, TRUST_PROXY: '1' }).trustProxy, 1);
+  assert.equal(loadConfig({ ...base, TRUST_PROXY: 'true' }).trustProxy, true);
+  assert.equal(loadConfig({ ...base, TRUST_PROXY: 'loopback' }).trustProxy, 'loopback');
+});

@@ -8,11 +8,28 @@ const { createAdminRouter } = require('./routes/admin');
 const { HttpError, asyncRoute, errorHandler } = require('./http');
 const { createRateLimiter } = require('./rateLimit');
 
+// The API answers JSON and images only, so it forbids everything else.
+function securityHeaders(req, res, next) {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+  });
+  if (req.secure) res.set('Strict-Transport-Security', 'max-age=15552000');
+  next();
+}
+
 function createApp({
   pool, authClientFactory, storage, authAdmin, staffEmailDomain = 'balaghi.local',
-  corsOrigins = [],
+  corsOrigins = [], trustProxy = false,
 }) {
   const app = express();
+  app.disable('x-powered-by');
+  // Behind a reverse proxy, trust its X-Forwarded-For so rate limits count the
+  // visitor's address rather than the proxy's.
+  if (trustProxy) app.set('trust proxy', trustProxy);
+  app.use(securityHeaders);
   app.use(cors(corsOrigins.length ? { origin: corsOrigins } : {}));
   app.use(express.json({ limit: '64kb' }));
 

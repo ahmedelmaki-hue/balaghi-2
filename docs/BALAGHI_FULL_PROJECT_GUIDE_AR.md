@@ -307,6 +307,9 @@ cd dashboard; npm run build
 - إعداد HTTP مناسب للتطوير المحلي فقط. النشر الفعلي يحتاج HTTPS، إعداد Auth/SMS حقيقي، نطاقات CORS صحيحة، مفاتيح محدودة ومحفوظة بالخادم، وحسابات إدارية فردية.
 - OTP ثابت ورقم الاختبار لا يصلحان للإنتاج. لا تشارك كلمة مرور حساب العامل التجريبي أو كلمات مرور المستخدمين الحقيقيين.
 
+- **الحماية في الخادم:** كل رد يحمل ترويسات أمان (`X-Content-Type-Options` و`X-Frame-Options` و`Referrer-Policy` و`Content-Security-Policy`)، ويُخفى إصدار Express. محاولات دخول اللوحة وطلب OTP والتحقق منه وتغيير كلمة المرور محدودة العدد (429 مع `Retry-After`). خلف وكيل عكسي اضبط `TRUST_PROXY=1`.
+- **قائمة النشر:** خطوات HTTPS وCORS وSupabase المستضاف وبناء اللوحة والتطبيق في قسم **Deploy** من `backend/README.md`.
+
 ## 14. الخرائط ومصدر البيانات
 
 - خريطة التطبيق الحالية: FlutterMap + MapLibre layer، style من `https://tiles.openfreemap.org/styles/bright`، وبيانات مصدرها OpenStreetMap. تحتاج إنترنت.
