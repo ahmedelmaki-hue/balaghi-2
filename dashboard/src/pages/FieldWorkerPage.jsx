@@ -7,6 +7,23 @@ import { fieldApi, imageUrl } from '../api.js';
 import CompletionCamera from '../CompletionCamera.jsx';
 import { agencies, fieldIssueReasons, verificationResults, fmtDate, number, categoryName, errorText, Brand, CategoryIcon, StatusPill, EmptyState, LoadingState } from '../shared.jsx';
 
+// Like the staff counters, the worker's lists refresh themselves every 30 seconds
+// while the page is visible, and at once when the worker comes back to it. These
+// refreshes are quiet: no loading screen, and a failed one keeps the list shown.
+const AUTO_REFRESH_MS = 30000;
+function useAutoRefresh(setTick, quiet) {
+  useEffect(() => {
+    const refresh = () => {
+      if (document.hidden) return;
+      quiet.current = true;
+      setTick((value) => value + 1);
+    };
+    const timer = setInterval(refresh, AUTO_REFRESH_MS);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+  }, [setTick, quiet]);
+}
+
 function FieldVerificationQueue() {
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
@@ -18,9 +35,13 @@ function FieldVerificationQueue() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [tick, setTick] = useState(0);
+  const quiet = useRef(false);
+  useAutoRefresh(setTick, quiet);
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    const silent = quiet.current;
+    quiet.current = false;
+    if (!silent) setLoading(true);
     fieldApi.verifications({ page })
       .then((result) => {
         if (!active) return;
@@ -30,7 +51,7 @@ function FieldVerificationQueue() {
         }
         setItems(result.items); setTotalPages(result.total_pages || 1); setError('');
       })
-      .catch((cause) => { if (active) setError(errorText(cause)); })
+      .catch((cause) => { if (active && !silent) setError(errorText(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [page, tick]);
@@ -95,15 +116,19 @@ export function FieldWorkerPage({ user, onLogout, onPassword }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [tick, setTick] = useState(0);
+  const quiet = useRef(false);
+  useAutoRefresh(setTick, quiet);
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    const silent = quiet.current;
+    quiet.current = false;
+    if (!silent) setLoading(true);
     fieldApi.assigned({ page, view: tab === 'resolved' ? 'resolved' : 'active' })
       .then((result) => { if (active) {
         if (page > Math.max(result.total_pages, 1)) { setPage(Math.max(result.total_pages, 1)); return; }
         setItems(result.items); setTotalPages(result.total_pages || 1); setError('');
       } })
-      .catch((cause) => { if (active) setError(errorText(cause)); })
+      .catch((cause) => { if (active && !silent) setError(errorText(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [page, tab, tick]);
