@@ -121,7 +121,7 @@ CREATE TABLE public.field_issue_reviews (
     ('not_found', 'wrong_location', 'duplicate', 'inaccessible', 'other')),
   note VARCHAR(500) NOT NULL CHECK (NULLIF(BTRIM(note), '') IS NOT NULL),
   raised_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  decision TEXT CHECK (decision IN ('continue', 'correct_location', 'reassign', 'reject')),
+  decision TEXT CHECK (decision IN ('continue', 'correct_location', 'reject')),
   decision_note VARCHAR(500),
   decided_by UUID REFERENCES public.profiles(id),
   decided_at TIMESTAMPTZ,

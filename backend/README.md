@@ -59,7 +59,7 @@ Administrators come in two kinds:
 
 The API checks the permission on every `/api/admin` request. Permission changes take effect on the next request and are recorded in the audit log.
 
-**Schema.** A new hosted database already gets everything from [`docs/ERD.sql`](../docs/ERD.sql). For an existing hosted database, run [`migrations/20261023_admin_role.sql`](migrations/20261023_admin_role.sql) and then [`migrations/20261023_admin_accounts.sql`](migrations/20261023_admin_accounts.sql) as two separate runs: PostgreSQL cannot use a new enum value in the transaction that adds it. For an existing local database, run `npm run migrate:admin:local` once.
+**Schema.** A new hosted database already gets everything from [`docs/ERD.sql`](../docs/ERD.sql). For an existing hosted database, run [`migrations/20261023_admin_role.sql`](migrations/20261023_admin_role.sql) and then [`migrations/20261023_admin_accounts.sql`](migrations/20261023_admin_accounts.sql) as two separate runs: PostgreSQL cannot use a new enum value in the transaction that adds it. For an existing local database, run `npm run migrate:admin:local` once. Then run `npm run migrate:field-decisions:local` (hosted: `migrations/20261102_field_review_decisions.sql`), which drops the unused `reassign` field-review decision unless old rows use it.
 
 **Owners.** No API grants a role, so create owners from the server. Create two, so one can reset the other's password:
 

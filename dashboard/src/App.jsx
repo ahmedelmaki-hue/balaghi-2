@@ -8,7 +8,7 @@ import {
   UserCog, UserPlus, UserRound, Users, X,
 } from 'lucide-react';
 import {
-  ApiError, adminApi, changePassword, fieldApi, imageUrl, login, logout, restoreSession, staffApi,
+  ApiError, adminApi, changePassword, fetchMe, fieldApi, imageUrl, login, logout, restoreSession, staffApi,
 } from './api.js';
 import { buildReportTimeline } from './reportTimeline.js';
 import CompletionCamera from './CompletionCamera.jsx';
@@ -1561,6 +1561,26 @@ export default function App() {
     const timer = setInterval(refreshCount, 30000);
     return () => { active = false; clearInterval(timer); };
   }, [user, refreshKey]);
+  // An owner may change this account's role or permissions while it is signed in.
+  // Check the server's view every minute and when the window regains focus, so
+  // the menu follows without signing out; the server enforces them regardless.
+  useEffect(() => {
+    if (!user || user.must_change_password) return undefined;
+    let active = true;
+    const access = (account) => JSON.stringify([account.role, account.is_owner,
+      [...(account.admin_permissions || [])].sort(), account.full_name]);
+    const sync = () => fetchMe().then((fresh) => {
+      if (active && fresh) setUser((current) => (current && access(current) !== access(fresh) ? { ...current, ...fresh } : current));
+    }).catch(() => {});
+    const timer = setInterval(sync, 60000);
+    window.addEventListener('focus', sync);
+    return () => { active = false; clearInterval(timer); window.removeEventListener('focus', sync); };
+  }, [user?.id, user?.must_change_password]);
+  // A page whose permission was withdrawn falls back to the overview.
+  useEffect(() => {
+    if (user && adminNavigation.some((item) => item.key === page) &&
+        !allowedAdminPages(user).some((item) => item.key === page)) setPage('overview');
+  }, [user, page]);
   const leave = () => {
     logout(); setUser(null); setSelectedId(null); setPage('overview'); setPasswordOpen(false);
   };

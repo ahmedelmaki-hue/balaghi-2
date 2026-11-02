@@ -189,6 +189,10 @@ export const fieldApi = {
   },
 };
 
+export async function fetchMe() {
+  return (await api('/auth/me')).user;
+}
+
 export async function changePassword(currentPassword, newPassword) {
   const data = await api('/auth/password', {
     method: 'POST',
