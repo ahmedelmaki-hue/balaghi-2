@@ -147,6 +147,9 @@ export const staffApi = {
   reviewCompletion: (id, decision, note) => api(`/reports/${encodeURIComponent(id)}/completion/review`, {
     method: 'PATCH', body: { decision, ...(note ? { note } : {}) },
   }),
+  releaseReport: (id, reason) => api(`/reports/${encodeURIComponent(id)}/release`, {
+    method: 'PATCH', body: { reason },
+  }),
   changeStatus: (id, status, reason) => api(`/reports/${encodeURIComponent(id)}/status`, {
     method: 'PATCH',
     body: { status, ...(reason ? { reason } : {}) },

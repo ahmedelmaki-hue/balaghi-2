@@ -337,6 +337,7 @@ function createReportsRouter({ pool, auth, storage }) {
          r.assigned_at, r.accepted_at, r.work_started_at,
          worker.full_name AS assigned_worker_name,
          worker.staff_username AS assigned_worker_username,
+         worker.is_active AS assigned_worker_active,
          approver.full_name AS approved_by_name,
          approver.staff_username AS approved_by_username, ${REJECTION_REASON}
        FROM public.reports r JOIN public.profiles p ON p.id = r.user_id
@@ -751,6 +752,54 @@ function createReportsRouter({ pool, auth, storage }) {
       throw error;
     } finally { client.release(); }
     res.json(updated);
+  }));
+
+  // A report held by a worker who cannot finish it (deactivated, moved, absent)
+  // returns to its agency's queue for another worker to claim. Work already
+  // started is undone in the public status, in_progress back to new, and the
+  // reason is kept in the history.
+  router.patch('/:id/release', auth('staff'), asyncRoute(async (req, res) => {
+    const id = reportId(req.params.id);
+    const reason = req.body?.reason;
+    if (typeof reason !== 'string' || !reason.trim() || reason.trim().length > 500) {
+      throw new HttpError(400, 'release reason required (1 to 500 characters)');
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const current = await client.query(
+        `SELECT status, approved_at, assigned_worker_id,
+          EXISTS (SELECT 1 FROM public.field_issue_reviews fi
+            WHERE fi.report_id = public.reports.id AND fi.decision IS NULL) AS field_issue_pending,
+          EXISTS (SELECT 1 FROM public.work_completion_reviews wc
+            WHERE wc.report_id = public.reports.id AND wc.decision IS NULL) AS completion_pending
+         FROM public.reports WHERE id = $1 FOR UPDATE`, [id]
+      );
+      const report = current.rows[0];
+      if (!report) throw new HttpError(404, 'not found');
+      if (!report.approved_at || !report.assigned_worker_id ||
+          !['new', 'in_progress'].includes(report.status)) {
+        throw new HttpError(409, 'report has no worker to release');
+      }
+      if (report.completion_pending) throw new HttpError(409, 'decide pending work completion first');
+      if (report.field_issue_pending) throw new HttpError(409, 'decide pending field issue first');
+      await client.query(
+        `UPDATE public.reports SET status = 'new', assigned_worker_id = NULL,
+           accepted_at = NULL, work_started_at = NULL, updated_at = NOW()
+         WHERE id = $1`, [id]
+      );
+      await client.query(
+        `INSERT INTO public.status_history
+         (report_id, old_status, new_status, changed_by, change_reason)
+         VALUES ($1, $2, 'new', $3, $4)`,
+        [id, report.status, req.user.id, reason.trim()]
+      );
+      await client.query('COMMIT');
+      res.json({ id, status: 'new', released_from: report.status });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally { client.release(); }
   }));
 
   router.post('/:id/completion', auth('field_worker'), upload.single('image'), asyncRoute(async (req, res) => {

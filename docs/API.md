@@ -34,6 +34,7 @@
 | PATCH | `/reports/:id/field-issue/review` | موظف | حسم الملاحظة بـ`decision`: `continue`، `correct_location` مع `latitude` و`longitude` داخل نطاق طرابلس المركز (وإلا 422)، أو `reject` مع `note` إلزامية |
 | POST | `/reports/:id/completion` | العامل الذي استلم البلاغ وبدأ العمل | `multipart/form-data` بصورة `image` إلزامية ووصف `note` اختياري حتى 500 حرف؛ يمكن إرسال `photo_latitude` و`photo_longitude` و`photo_accuracy_m` معًا عند توفر موقع الجهاز؛ تبقى الحالة `in_progress` |
 | PATCH | `/reports/:id/completion/review` | موظف | `decision=confirmed` لتأكيد الحل وتغيير الحالة إلى `resolved`، أو `decision=returned` مع `note` إلزامية لإعادته للعمل |
+| PATCH | `/reports/:id/release` | موظف | إعادة بلاغ معتمد استلمه عامل (جديد أو قيد المعالجة) إلى قائمة جهته مع `reason` إلزامي: يُفك عن العامل، وتعود حالة «قيد المعالجة» إلى «جديد» مع سجل في تاريخ الحالات. يُرفض بـ409 أثناء طلب إنجاز أو ملاحظة ميدانية معلّقين |
 | PATCH | `/reports/:id/status` | موظف | تغيير الحالة وفق القواعد أدناه وتسجيل السبب والموظف في عملية واحدة |
 | GET | `/stats/overview` | موظف | العدد الإجمالي والأعداد حسب الحالة والتصنيف، و`pending_review` و`pending_field_review` و`pending_completion` للقوائم التي تنتظر قرار الموظف |
 | POST | `/auth/password` | موظف أو عامل أو مسؤول | تغيير كلمة المرور بـ`current_password` و`new_password` (10 إلى 72 حرفًا، مختلفة عن الحالية). يعمل حتى مع `must_change_password`، ويُنهي الجلسات الأخرى ويعيد جلسة جديدة؛ خطأ الكلمة الحالية يُرد بـ400 `current password incorrect` |

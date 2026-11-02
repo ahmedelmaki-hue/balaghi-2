@@ -37,7 +37,7 @@ export function buildReportTimeline(report, statusHistory = [], fieldReviews = [
     if (duplicateDecision || confirmedCompletion) continue;
     const title = {
       in_progress: 'بدأت المعالجة', resolved: 'تم الحل',
-      rejected: 'تم رفض البلاغ', new: 'عاد البلاغ إلى حالة جديد',
+      rejected: 'تم رفض البلاغ', new: 'أُعيد البلاغ إلى قائمة جهة العمل',
     }[entry.new_status] || 'تغيّرت حالة البلاغ';
     add(`status-${entry.id}`, entry.changed_at, title,
       entry.changed_by_name || 'موظف', entry.change_reason, 4);
