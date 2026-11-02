@@ -106,6 +106,7 @@ const adminMessages = {
   'owner accounts are managed on the server': 'حساب المسؤول الرئيسي يُدار من الخادم فقط.',
   'permissions apply to other administrators only': 'الصلاحيات تُحدَّد للمسؤولين الآخرين فقط.',
   'invalid permissions': 'اختر صلاحيات صحيحة.',
+  'too many attempts': 'محاولات كثيرة متتالية. انتظر بضع دقائق ثم حاول مجددًا.',
 };
 const accountRoleName = (account) => (account.role === 'admin' && account.is_owner
   ? 'مسؤول رئيسي' : roleNames[account.role]);

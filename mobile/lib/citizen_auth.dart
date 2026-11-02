@@ -156,7 +156,11 @@ class CitizenAuthApi {
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       if (response.statusCode == 429) {
-        throw const AuthFailure('انتظر قليلًا قبل طلب رمز جديد.');
+        throw AuthFailure(
+          path == '/auth/otp/verify'
+              ? 'محاولات كثيرة متتالية. انتظر بضع دقائق ثم أعد المحاولة.'
+              : 'انتظر قليلًا قبل طلب رمز جديد.',
+        );
       }
       if (response.statusCode == 403) {
         throw const AuthFailure(suspendedAccountMessage);

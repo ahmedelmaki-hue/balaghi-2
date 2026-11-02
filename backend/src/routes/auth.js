@@ -3,6 +3,7 @@ const { HttpError, asyncRoute } = require('../http');
 const { validPhone, authPhone } = require('../phone');
 const { ACCOUNT_ROLES } = require('../middleware/auth');
 const { passwordProblem, audit } = require('../accounts');
+const { AUTH_LIMITS } = require('../rateLimit');
 
 const CODE_RE = /^\d{6,10}$/;
 const USERNAME_RE = /^[a-z][a-z0-9_.-]{2,49}$/;
@@ -34,7 +35,7 @@ function sessionResponse(session, profile) {
   };
 }
 
-function createAuthRouter({ pool, authClientFactory, authAdmin, auth }) {
+function createAuthRouter({ pool, authClientFactory, authAdmin, auth, limit }) {
   const router = express.Router();
 
   async function assertCitizenActive(phone) {
@@ -79,7 +80,7 @@ function createAuthRouter({ pool, authClientFactory, authAdmin, auth }) {
     return publicProfile(profile);
   }
 
-  router.post('/otp/send', asyncRoute(async (req, res) => {
+  router.post('/otp/send', limit(AUTH_LIMITS.otpSend), asyncRoute(async (req, res) => {
     const { phone } = req.body || {};
     if (!validPhone(phone)) throw new HttpError(400, 'phone must use international format');
     await assertCitizenActive(phone);
@@ -92,7 +93,7 @@ function createAuthRouter({ pool, authClientFactory, authAdmin, auth }) {
     res.json({ message: 'verification code requested' });
   }));
 
-  router.post('/otp/verify', asyncRoute(async (req, res) => {
+  router.post('/otp/verify', limit(AUTH_LIMITS.otpVerify), asyncRoute(async (req, res) => {
     const { phone, code } = req.body || {};
     if (!validPhone(phone) || typeof code !== 'string' || !CODE_RE.test(code)) {
       throw new HttpError(400, 'invalid phone or code');
@@ -112,7 +113,7 @@ function createAuthRouter({ pool, authClientFactory, authAdmin, auth }) {
     res.json(sessionResponse(data.session, profile));
   }));
 
-  router.post('/staff/login', asyncRoute(async (req, res) => {
+  router.post('/staff/login', limit(AUTH_LIMITS.staffLogin), asyncRoute(async (req, res) => {
     const { username, password } = req.body || {};
     const normalized = typeof username === 'string' ? username.trim().toLowerCase() : '';
     if (!USERNAME_RE.test(normalized) || typeof password !== 'string' || !password) {
@@ -177,7 +178,8 @@ function createAuthRouter({ pool, authClientFactory, authAdmin, auth }) {
 
   // Dashboard accounts change their own password: required after a temporary
   // password, optional at any other time. The administrator never learns it.
-  router.post('/password', auth(null, { allowPasswordChange: true }), asyncRoute(async (req, res) => {
+  router.post('/password', auth(null, { allowPasswordChange: true }),
+    limit(AUTH_LIMITS.passwordChange), asyncRoute(async (req, res) => {
     if (req.user.role === 'citizen') throw new HttpError(403, 'forbidden');
     const { current_password: current, new_password: next } = req.body || {};
     if (typeof current !== 'string' || !current) {
