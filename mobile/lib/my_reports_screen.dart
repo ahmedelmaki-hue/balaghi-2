@@ -11,6 +11,7 @@ import 'pending_reports.dart';
 import 'public_reports.dart';
 import 'report_details_screen.dart';
 import 'report_image_viewer.dart';
+import 'report_updates.dart';
 import 'report_ui.dart';
 
 const _ink = Color(0xFF12323F);
@@ -27,6 +28,7 @@ class MyReportsScreen extends StatefulWidget {
     this.repository,
     this.pendingStore,
     this.createRepository,
+    this.seenStore = const SeenReportStore(),
   });
 
   final bool previewMode;
@@ -34,6 +36,7 @@ class MyReportsScreen extends StatefulWidget {
   final MyReportsRepository? repository;
   final PendingReportStore? pendingStore;
   final CreateReportRepository? createRepository;
+  final SeenReportStore seenStore;
 
   @override
   State<MyReportsScreen> createState() => _MyReportsScreenState();
@@ -51,6 +54,8 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
   ReportStatus? _filter;
   List<MyReport> _reports = const [];
   List<PendingReport> _pending = const [];
+  // Reports whose stage changed since the last visit; marked for this visit only.
+  final Set<String> _updated = {};
   String? _pendingError;
   bool _loading = true;
   bool _loadingMore = false;
@@ -114,6 +119,13 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
         incoming = result.items;
         page = result.page;
         hasMore = page < result.totalPages;
+        try {
+          _updated.addAll(
+            await markReportsSeen(widget.seenStore, session.phone, incoming),
+          );
+        } catch (_) {
+          // The marks are a convenience; the list still shows every status.
+        }
       }
       if (!mounted || serial != _requestSerial) return;
       setState(() {
@@ -509,6 +521,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 
   Widget _reportCard(MyReport report) {
     final rejected = report.isRejected;
+    final updated = _updated.contains(report.id);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
@@ -520,7 +533,10 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: _border),
+              border: Border.all(
+                color: updated ? _gold : _border,
+                width: updated ? 1.5 : 1,
+              ),
               borderRadius: BorderRadius.circular(20),
               boxShadow: const [
                 BoxShadow(
@@ -542,13 +558,23 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            report.category.singularLabel,
-                            style: const TextStyle(
-                              color: _ink,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  report.category.singularLabel,
+                                  style: const TextStyle(
+                                    color: _ink,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              if (updated) ...[
+                                const SizedBox(width: 7),
+                                _updatedPill(),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 5),
                           Text(
@@ -758,6 +784,26 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
         color: Color(0xFF9A6700),
         fontSize: 11,
         fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+
+  Widget _updatedPill() => Semantics(
+    label: 'تغيّرت حالة هذا البلاغ منذ آخر زيارة',
+    excludeSemantics: true,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: _ink,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: const Text(
+        'تحدّث',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     ),
   );

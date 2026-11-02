@@ -15,10 +15,12 @@ import 'citizen_auth_screen.dart';
 import 'create_report_repository.dart';
 import 'create_report_screen.dart';
 import 'marker_clusters.dart';
+import 'my_reports_repository.dart';
 import 'my_reports_screen.dart';
 import 'pending_reports.dart';
 import 'public_reports.dart';
 import 'report_details_screen.dart';
+import 'report_updates.dart';
 import 'report_ui.dart';
 
 const _tripoli = LatLng(32.8912, 13.1905);
@@ -44,6 +46,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
   final _previewStore = const CitizenAuthPreviewStore();
   final _pendingStore = PendingReportStore();
   final _reportSender = CreateReportRepository(baseUrl: apiBaseUrl);
+  final _myReports = MyReportsRepository(baseUrl: apiBaseUrl);
   final _demoReports = demoPublicReports();
   AppLifecycleListener? _lifecycle;
   Timer? _refreshTimer;
@@ -60,6 +63,9 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
   PublicReport? _selectedReport;
   LatLng? _userLocation;
   String? _loadError;
+  // Own reports whose status changed since «بلاغاتي» was last opened.
+  int _reportUpdates = 0;
+  int _updatesSerial = 0;
 
   @override
   void initState() {
@@ -70,7 +76,13 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
     }
     if (!authPreviewMode) {
       _sendSavedReports();
-      _lifecycle = AppLifecycleListener(onResume: _sendSavedReports);
+      _checkReportUpdates();
+      _lifecycle = AppLifecycleListener(
+        onResume: () {
+          _sendSavedReports();
+          _checkReportUpdates();
+        },
+      );
     }
   }
 
@@ -79,6 +91,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
     _lifecycle?.dispose();
     _refreshTimer?.cancel();
     _reportSender.dispose();
+    _myReports.dispose();
     _repository.dispose();
     _authApi.dispose();
     _mapController.dispose();
@@ -248,6 +261,31 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
 
   /// Sends reports saved while offline when the app opens or comes back to
   /// the foreground. Checks the device first so it costs nothing when empty.
+  /// Quietly asks the server how many of the citizen's reports changed since
+  /// «بلاغاتي» was last opened. Signed-out visitors and failures show no mark.
+  Future<void> _checkReportUpdates() async {
+    if (authPreviewMode) return;
+    final serial = ++_updatesSerial;
+    var count = 0;
+    try {
+      final saved = await _authStore.load();
+      if (saved != null && !saved.needsProfile) {
+        final session = await _authApi.restore(_authStore);
+        if (session != null && !session.needsProfile) {
+          count = await countReportUpdates(
+            session: session,
+            repository: _myReports,
+          );
+        }
+      }
+    } catch (_) {
+      return;
+    }
+    if (mounted && serial == _updatesSerial) {
+      setState(() => _reportUpdates = count);
+    }
+  }
+
   Future<void> _sendSavedReports() async {
     try {
       final saved = await _authStore.load();
@@ -360,6 +398,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
         builder: (_) => MyReportsScreen(previewMode: authPreviewMode),
       ),
     );
+    _checkReportUpdates();
   }
 
   void _zoomInto(MarkerCluster cluster) {
@@ -1117,6 +1156,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
                 icon: Icons.assignment_outlined,
                 label: 'بلاغاتي',
                 onTap: _openMyReports,
+                badge: _reportUpdates,
               ),
             ),
           ],
@@ -1327,6 +1367,7 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.selected = false,
+    this.badge = 0,
   });
 
   final IconData icon;
@@ -1334,31 +1375,44 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
   final bool selected;
 
+  /// A count of updates shown on the icon; zero shows nothing.
+  final int badge;
+
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          color: selected ? _homeTeal : const Color(0xFF87949A),
-          size: 25,
-        ),
-        const SizedBox(height: 3),
-        BalaghiButtonLabel(
-          label,
-          style: TextStyle(
-            color: selected ? _homeTeal : const Color(0xFF87949A),
-            fontSize: 11,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+  Widget build(BuildContext context) => Semantics(
+    label: badge > 0 ? '$label، $badge بلاغات تغيّرت حالتها' : null,
+    child: InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Badge(
+            isLabelVisible: badge > 0,
+            label: Text(badge > 9 ? '9+' : '$badge'),
+            backgroundColor: const Color(0xFFC93636),
+            textColor: Colors.white,
+            offset: const Offset(-6, -4),
+            child: Icon(
+              icon,
+              color: selected ? _homeTeal : const Color(0xFF87949A),
+              size: 25,
+            ),
           ),
-        ),
-        if (selected) ...[
           const SizedBox(height: 3),
-          const CircleAvatar(radius: 3, backgroundColor: _homeTeal),
+          BalaghiButtonLabel(
+            label,
+            style: TextStyle(
+              color: selected ? _homeTeal : const Color(0xFF87949A),
+              fontSize: 11,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+            ),
+          ),
+          if (selected) ...[
+            const SizedBox(height: 3),
+            const CircleAvatar(radius: 3, backgroundColor: _homeTeal),
+          ],
         ],
-      ],
+      ),
     ),
   );
 }
