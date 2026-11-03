@@ -1377,7 +1377,7 @@ test('a new report gets its street name after the response is sent', async () =>
     }
     if (sql.includes('SET address_text')) {
       addressWrites.push(params);
-      return { rows: [] };
+      return { rows: [], rowCount: 1 };
     }
     return reports.query(sql, params);
   };

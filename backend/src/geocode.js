@@ -69,6 +69,10 @@ function createGeocoder({
 
 // Writes the street name of a report that has none. The location is read and
 // compared again on write, so a lookup never lands on a corrected location.
+// The comparison allows a hair of difference: a pooled connection may send
+// coordinates rounded to 15 digits, which never equal the stored ones exactly.
+const SAME_POINT_DEGREES = 1e-9;
+
 async function fillReportAddress(pool, geocoder, id) {
   const current = await pool.query(
     'SELECT latitude, longitude FROM public.reports WHERE id = $1 AND address_text IS NULL', [id]
@@ -77,11 +81,13 @@ async function fillReportAddress(pool, geocoder, id) {
   const { latitude, longitude } = current.rows[0];
   const address = await geocoder.reverse(latitude, longitude);
   if (!address) return null;
-  await pool.query(
+  const saved = await pool.query(
     `UPDATE public.reports SET address_text = $2
-     WHERE id = $1 AND address_text IS NULL AND latitude = $3 AND longitude = $4`,
-    [id, address, latitude, longitude]
+     WHERE id = $1 AND address_text IS NULL
+       AND ABS(latitude - $3) < $5 AND ABS(longitude - $4) < $5`,
+    [id, address, latitude, longitude, SAME_POINT_DEGREES]
   );
+  if (saved.rowCount !== 1) throw new Error('the location changed before the street name was saved');
   return address;
 }
 

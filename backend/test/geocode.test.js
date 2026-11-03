@@ -60,20 +60,26 @@ test('an address is written only to a report still at the looked-up location', a
         return { rows: params[0] === '1' ? [{ latitude: 32.88, longitude: 13.19 }] : [] };
       }
       writes.push({ sql, params });
-      return { rows: [] };
+      return { rows: [], rowCount: moved ? 0 : 1 };
     },
   };
+  let moved = false;
   const geocoder = { reverse: async () => 'شارع عمر المختار' };
 
   assert.equal(await fillReportAddress(pool, geocoder, '1'), 'شارع عمر المختار');
-  assert.deepEqual(writes[0].params, ['1', 'شارع عمر المختار', 32.88, 13.19]);
-  assert.match(writes[0].sql, /address_text IS NULL AND latitude = \$3 AND longitude = \$4/);
+  assert.deepEqual(writes[0].params, ['1', 'شارع عمر المختار', 32.88, 13.19, 1e-9]);
+  // Not exact equality: pooled connections may send coordinates rounded to 15 digits.
+  assert.match(writes[0].sql, /ABS\(latitude - \$3\) < \$5 AND ABS\(longitude - \$4\) < \$5/);
 
   // A report that already has an address, or none at all, is left alone.
   assert.equal(await fillReportAddress(pool, geocoder, '2'), null);
   assert.equal(writes.length, 1);
   assert.equal(await fillReportAddress(pool, { reverse: async () => null }, '1'), null);
   assert.equal(writes.length, 1);
+
+  // A name that could not be saved is reported, never passed off as saved.
+  moved = true;
+  await assert.rejects(fillReportAddress(pool, geocoder, '1'), /location changed/);
 });
 
 test('a refusal sent with status 200 counts as a failure, not as no street', async () => {
