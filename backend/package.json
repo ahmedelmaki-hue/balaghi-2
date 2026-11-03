@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Balaghi API - Node + Express + PostgreSQL",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "node --watch src/server.js",
     "dev:local": "node --watch --require ./scripts/local-env.js src/server.js",

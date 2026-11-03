@@ -132,6 +132,9 @@ function createReportsRouter({ pool, auth, storage, geocoder = null }) {
   const lookUpAddress = (id) => {
     if (!geocoder) return;
     fillReportAddress(pool, geocoder, id)
+      .then((address) => console.log(address
+        ? `Address lookup for report ${id}: ${address}`
+        : `Address lookup for report ${id}: no street name found`))
       .catch((error) => console.warn(`Address lookup for report ${id} failed: ${error.message}`));
   };
 

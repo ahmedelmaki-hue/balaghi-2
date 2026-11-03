@@ -75,3 +75,11 @@ test('an address is written only to a report still at the looked-up location', a
   assert.equal(await fillReportAddress(pool, { reverse: async () => null }, '1'), null);
   assert.equal(writes.length, 1);
 });
+
+test('a refusal sent with status 200 counts as a failure, not as no street', async () => {
+  const geocoder = createGeocoder({
+    wait: async () => {},
+    fetchImpl: async () => ({ ok: true, json: async () => ({ error: 'Unable to geocode' }) }),
+  });
+  await assert.rejects(geocoder.reverse(32.88, 13.19), /refused: Unable to geocode/);
+});

@@ -51,7 +51,10 @@ function createGeocoder({
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) throw new Error(`address lookup returned ${response.status}`);
-    return shortAddress(await response.json());
+    const result = await response.json();
+    // Nominatim answers some refusals with 200 and an error message.
+    if (result?.error) throw new Error(`address lookup refused: ${result.error}`);
+    return shortAddress(result);
   }
 
   return {
