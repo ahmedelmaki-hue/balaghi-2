@@ -1367,3 +1367,30 @@ test('staff see same-category reports near a report; citizens cannot ask', async
       { headers: { authorization: 'Bearer citizen-token' } })).status, 403);
   });
 });
+
+test('a new report gets its street name after the response is sent', async () => {
+  const reports = citizenReportsPool();
+  const addressWrites = [];
+  const query = async (sql, params) => {
+    if (sql.startsWith('SELECT latitude, longitude FROM public.reports')) {
+      return { rows: [{ latitude: 32.88, longitude: 13.19 }] };
+    }
+    if (sql.includes('SET address_text')) {
+      addressWrites.push(params);
+      return { rows: [] };
+    }
+    return reports.query(sql, params);
+  };
+  const pool = { query, async connect() { return { query, release() {} }; } };
+  const lookups = [];
+  const geocoder = { async reverse(lat, lng) { lookups.push([lat, lng]); return 'شارع عمر المختار'; } };
+
+  await withServer({ pool, authClientFactory, storage: fakeStorage(), geocoder }, async (base) => {
+    const created = await sendReport(base, '66666666-6666-4666-8666-666666666666');
+    assert.equal(created.status, 201);
+    assert.equal(created.body.address_text, null, 'the citizen is not kept waiting for the lookup');
+    for (let i = 0; i < 50 && !addressWrites.length; i += 1) await new Promise((done) => setTimeout(done, 10));
+    assert.deepEqual(lookups, [[32.88, 13.19]]);
+    assert.deepEqual(addressWrites[0].slice(0, 2), ['1', 'شارع عمر المختار']);
+  });
+});

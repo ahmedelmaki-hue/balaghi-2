@@ -620,15 +620,23 @@ class _LocationPreview extends StatelessWidget {
             bottom: 7,
             right: 7,
             child: Container(
+              constraints: const BoxConstraints(maxWidth: 230),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: _ink.withValues(alpha: 0.82),
                 borderRadius: BorderRadius.circular(20),
               ),
+              // The street name when the server found one, else the coordinates.
               child: Text(
-                '${report.location.latitude.toStringAsFixed(4)}, '
-                '${report.location.longitude.toStringAsFixed(4)}',
-                textDirection: TextDirection.ltr,
+                report.addressText?.trim().isNotEmpty == true
+                    ? report.addressText!.trim()
+                    : '${report.location.latitude.toStringAsFixed(4)}, '
+                          '${report.location.longitude.toStringAsFixed(4)}',
+                textDirection: report.addressText?.trim().isNotEmpty == true
+                    ? TextDirection.rtl
+                    : TextDirection.ltr,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.cairo(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,

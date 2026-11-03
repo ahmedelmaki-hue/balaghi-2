@@ -12,7 +12,7 @@
 | POST | `/auth/refresh` | عام | تجديد جلسة الدخول باستخدام `refresh_token` |
 | GET | `/auth/me` | مستخدم | بيانات الحساب الحالي ودوره |
 | PATCH | `/auth/me` | مواطن | حفظ `full_name` عند أول دخول؛ لا يقبل تعديل الدور |
-| POST | `/reports` | مواطن | إنشاء بلاغ: `image`، `category`، `latitude`، `longitude`، `client_request_id`، و`description`/`address_text` اختياريان. الحد 10 بلاغات جديدة لكل مواطن في اليوم بتوقيت طرابلس؛ ما بعدها يرد بـ429 `daily report limit reached` |
+| POST | `/reports` | مواطن | إنشاء بلاغ: `image`، `category`، `latitude`، `longitude`، `client_request_id`، و`description`/`address_text` اختياريان. الحد 10 بلاغات جديدة لكل مواطن في اليوم بتوقيت طرابلس؛ ما بعدها يرد بـ429 `daily report limit reached`. بعد الرد يملأ الخادم `address_text` باسم الشارع والحي من OpenStreetMap إن لم يُرسَل |
 | GET | `/reports/public?bbox=&status=&category=&cursor=&limit=` | عام | علامات بلاغات المنطقة الظاهرة على الخريطة، على دفعات لا تتجاوز 500، دون صور أو بيانات المُبلّغ |
 | GET | `/reports/:id/public` | عام | تفاصيل بلاغ عامة دون بيانات المُبلّغ |
 | GET | `/reports/mine?status=&page=&limit=` | مواطن | بلاغات صاحب الجلسة وحده، بما فيها المرفوضة، مع فلتر حالة اختياري وصفحات |

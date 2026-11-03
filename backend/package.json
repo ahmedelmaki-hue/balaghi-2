@@ -18,6 +18,8 @@
     "migrate:admin:local": "node --require ./scripts/local-env.js scripts/migrate-local-admin.js",
     "migrate:field-decisions:local": "node --require ./scripts/local-env.js scripts/migrate-local-field-review-decisions.js",
     "worker:create:local": "node --require ./scripts/local-env.js scripts/create-local-field-worker.js",
+    "addresses:backfill": "node scripts/backfill-addresses.js",
+    "addresses:backfill:local": "node --require ./scripts/local-env.js scripts/backfill-addresses.js",
     "admin:create": "node --require dotenv/config scripts/create-admin.js",
     "admin:create:local": "node --require ./scripts/local-env.js scripts/create-admin.js",
     "supabase:start:local": "node scripts/local-supabase.js start",

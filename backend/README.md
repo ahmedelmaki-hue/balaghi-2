@@ -92,6 +92,16 @@ The local setup uses HTTP, a fixed test OTP and an in-memory rate limiter. Befor
 
 Every response carries `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and a restrictive `Content-Security-Policy`. The API only answers JSON and images.
 
+## Street names
+
+After a report is saved, and after a staff member corrects its location, the API looks up the street and area in Arabic from OpenStreetMap's Nominatim service and stores it in `address_text` (for example «شارع السيدي، محلة الظهرة»). The citizen gets the response first; a failed or empty lookup leaves the coordinates on screen. Lookups are one per second, as the service asks, and send only the coordinates.
+
+- `GEOCODER=off` turns lookups off, for example offline.
+- `GEOCODER_URL` points at another Nominatim server; `GEOCODER_USER_AGENT` names the app in each request.
+- `npm run addresses:backfill:local` (or `addresses:backfill` with `.env`) fills reports saved without a street name; it is safe to run again.
+
+The server needs internet access for this. Without it, every screen shows the coordinates as before.
+
 ## Check
 
 ```powershell

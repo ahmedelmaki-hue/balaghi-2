@@ -21,6 +21,11 @@ function loadConfig(env = process.env) {
     staffEmailDomain: (env.STAFF_EMAIL_DOMAIN || 'balaghi.local').toLowerCase(),
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     corsOrigins: (env.CORS_ORIGINS || '').split(',').map((origin) => origin.trim()).filter(Boolean),
+    // Street names from OpenStreetMap; GEOCODER=off keeps coordinates only.
+    geocoder: env.GEOCODER === 'off' ? null : {
+      url: env.GEOCODER_URL || undefined,
+      userAgent: env.GEOCODER_USER_AGENT || undefined,
+    },
   };
 
   const missing = [

@@ -4,6 +4,7 @@ const { HttpError, asyncRoute } = require('../http');
 const { prepareImage, MAX_IMAGE_BYTES } = require('../storage');
 const { isPointInTripoliCenter } = require('../report_area');
 const { optionalChoice, positiveInteger, pagination } = require('../params');
+const { fillReportAddress } = require('../geocode');
 
 const CATEGORIES = ['pothole', 'water_leak', 'garbage'];
 const AGENCY_BY_CATEGORY = {
@@ -124,8 +125,15 @@ function mapMarker(row) {
   return { id, category, latitude, longitude, status, created_at };
 }
 
-function createReportsRouter({ pool, auth, storage }) {
+function createReportsRouter({ pool, auth, storage, geocoder = null }) {
   const router = express.Router();
+  // The street name is looked up after the response is sent; when the lookup
+  // fails or finds nothing, screens keep showing the coordinates.
+  const lookUpAddress = (id) => {
+    if (!geocoder) return;
+    fillReportAddress(pool, geocoder, id)
+      .catch((error) => console.warn(`Address lookup for report ${id} failed: ${error.message}`));
+  };
 
   router.get('/public', asyncRoute(async (req, res) => {
     const bounds = bbox(req.query.bbox);
@@ -531,6 +539,7 @@ function createReportsRouter({ pool, auth, storage }) {
       client.release();
     }
     res.status(201).json((await storage.withSignedImages([created]))[0]);
+    if (!created.address_text) lookUpAddress(created.id);
   }));
 
   router.patch('/:id/verification/request', auth('staff'), asyncRoute(async (req, res) => {
@@ -681,6 +690,7 @@ function createReportsRouter({ pool, auth, storage }) {
       );
       await client.query('COMMIT');
       res.json({ id, latitude: lat, longitude: lng });
+      lookUpAddress(id);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -1106,6 +1116,7 @@ function createReportsRouter({ pool, auth, storage }) {
       );
       await client.query('COMMIT');
       res.json(result.rows[0]);
+      if (correctingLocation) lookUpAddress(id);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

@@ -3,6 +3,7 @@ const { createPool } = require('./db');
 const { createAuthClientFactory, createServiceClient } = require('./supabase');
 const { createStorage } = require('./storage');
 const { createApp } = require('./app');
+const { createGeocoder } = require('./geocode');
 
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
@@ -13,6 +14,7 @@ const app = createApp({
   pool, authClientFactory, storage, authAdmin: serviceClient.auth.admin,
   staffEmailDomain: config.staffEmailDomain, corsOrigins: config.corsOrigins,
   trustProxy: config.trustProxy,
+  geocoder: config.geocoder && createGeocoder(config.geocoder),
 });
 
 if (process.env.NODE_ENV === 'production' && !config.corsOrigins.length) {
