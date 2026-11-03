@@ -92,6 +92,16 @@ The local setup uses HTTP, a fixed test OTP and an in-memory rate limiter. Befor
 
 Every response carries `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and a restrictive `Content-Security-Policy`. The API only answers JSON and images.
 
+## Sign-in codes by SMS (Resala)
+
+Supabase makes and checks every citizen sign-in code. With its **Send SMS hook** it posts the code to `POST /api/auth/sms-hook` instead of texting it, and the API sends it through [Resala](https://resala.ly). The app and the sign-in flow do not change. Supabase test numbers keep working without any SMS.
+
+1. **Resala template.** In Resala > Message templates, create one such as `رمز الدخول إلى بلاغي: $1` and wait until it is APPROVED. Copy its id. Resala sends free text only through approved templates.
+2. **Supabase hook.** In Supabase > Authentication > Hooks, add a *Send SMS* hook of type HTTPS with the URL `https://<your-api>/api/auth/sms-hook`, generate its secret, and save.
+3. **API settings** (on Render: Environment): `RESALA_API_KEY` (starts with `rsl_`), `RESALA_TEMPLATE_ID`, `SMS_HOOK_SECRET` (the `v1,whsec_...` value), and optionally `RESALA_SENDER`. Start with `RESALA_TEST=true` (Resala's sandbox: nothing is sent or charged), then remove it.
+
+The hook checks Supabase's signature and refuses requests older than five minutes. It accepts Libyan mobiles only (091 to 094), never retries a failed send, and never logs the code; the log shows `Sign-in code sent to 2189****5678` or why it was not sent. If the Resala balance runs out the log says so, and the citizen sees that the code could not be sent.
+
 ## Street names
 
 After a report is saved, and after a staff member corrects its location, the API looks up the street and area in Arabic from OpenStreetMap's Nominatim service and stores it in `address_text` (for example «شارع السيدي، محلة الظهرة»). The citizen gets the response first; a failed or empty lookup leaves the coordinates on screen. Lookups are one per second, as the service asks, and send only the coordinates.

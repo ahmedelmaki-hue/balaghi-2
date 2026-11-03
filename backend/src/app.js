@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { createAuthMiddleware } = require('./middleware/auth');
 const { createAuthRouter } = require('./routes/auth');
+const { createSmsHookRouter } = require('./smsHook');
 const { createReportsRouter } = require('./routes/reports');
 const { createStatsRouter } = require('./routes/stats');
 const { createAdminRouter } = require('./routes/admin');
@@ -22,7 +23,7 @@ function securityHeaders(req, res, next) {
 
 function createApp({
   pool, authClientFactory, storage, authAdmin, staffEmailDomain = 'balaghi.local',
-  corsOrigins = [], trustProxy = false, geocoder = null,
+  corsOrigins = [], trustProxy = false, geocoder = null, smsHook = null,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -31,7 +32,8 @@ function createApp({
   if (trustProxy) app.set('trust proxy', trustProxy);
   app.use(securityHeaders);
   app.use(cors(corsOrigins.length ? { origin: corsOrigins } : {}));
-  app.use(express.json({ limit: '64kb' }));
+  // The raw bytes are kept for checking signed webhooks (the SMS hook).
+  app.use(express.json({ limit: '64kb', verify: (req, res, buffer) => { req.rawBody = buffer; } }));
 
   const auth = createAuthMiddleware({ pool, authClientFactory });
   const limit = createRateLimiter();
@@ -41,6 +43,7 @@ function createApp({
     res.set('Cache-Control', 'private, max-age=300');
     res.type('jpeg').send(image);
   }));
+  if (smsHook) app.use('/api/auth/sms-hook', createSmsHookRouter(smsHook));
   app.use('/api/auth', createAuthRouter({ pool, authClientFactory, authAdmin, auth, limit }));
   app.use('/api/reports', createReportsRouter({ pool, auth, storage, geocoder }));
   app.use('/api/stats', createStatsRouter({ pool, auth }));

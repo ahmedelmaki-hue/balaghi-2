@@ -21,6 +21,17 @@ function loadConfig(env = process.env) {
     staffEmailDomain: (env.STAFF_EMAIL_DOMAIN || 'balaghi.local').toLowerCase(),
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     corsOrigins: (env.CORS_ORIGINS || '').split(',').map((origin) => origin.trim()).filter(Boolean),
+    // Sign-in codes by SMS through Resala, called by Supabase's Send SMS hook.
+    // All three are needed; without them Supabase sends codes itself (or test codes only).
+    resala: env.RESALA_API_KEY && env.RESALA_TEMPLATE_ID && env.SMS_HOOK_SECRET ? {
+      apiKey: env.RESALA_API_KEY,
+      templateId: env.RESALA_TEMPLATE_ID,
+      hookSecret: env.SMS_HOOK_SECRET,
+      sender: env.RESALA_SENDER || undefined,
+      // RESALA_TEST=true: Resala's sandbox, nothing is sent or charged.
+      test: env.RESALA_TEST === 'true',
+      baseUrl: env.RESALA_BASE_URL || undefined,
+    } : null,
     // Street names from OpenStreetMap; GEOCODER=off keeps coordinates only.
     geocoder: env.GEOCODER === 'off' ? null : {
       url: env.GEOCODER_URL || undefined,
