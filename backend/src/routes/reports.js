@@ -30,6 +30,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Reports one citizen may send per calendar day in Tripoli. Every sent report counts,
 // rejected ones included; resending the same request returns it and costs nothing.
 const DAILY_REPORT_LIMIT = 10;
+// What counts as "near" when a reviewer looks for a report sent before.
+const NEARBY_RADIUS_M = 100;
+const NEARBY_RESOLVED_DAYS = 30;
 const SENT_TODAY = `SELECT COUNT(*)::int AS total FROM public.reports
   WHERE user_id = $1
     AND created_at >= (date_trunc('day', NOW() AT TIME ZONE 'Africa/Tripoli') AT TIME ZONE 'Africa/Tripoli')`;
@@ -333,6 +336,41 @@ function createReportsRouter({ pool, auth, storage }) {
       items: items.map((row) => ({ ...mapMarker(row), approved_at: row.approved_at })),
       next_cursor: rows.length > limit ? nextCursor(items[items.length - 1]) : null,
     });
+  }));
+
+  // Possible duplicates for the reviewer: same category within NEARBY_RADIUS_M,
+  // still open or resolved recently (an old fixed pothole reported again is new).
+  router.get('/:id/nearby', auth('staff'), asyncRoute(async (req, res) => {
+    const id = reportId(req.params.id);
+    const target = await pool.query(
+      'SELECT id, category, latitude, longitude FROM public.reports WHERE id = $1', [id]
+    );
+    if (!target.rows[0]) throw new HttpError(404, 'not found');
+    const { category, latitude, longitude } = target.rows[0];
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    // A box a little larger than the radius lets the index narrow the rows first.
+    const latDelta = (NEARBY_RADIUS_M * 1.2) / 111320;
+    const lngDelta = (NEARBY_RADIUS_M * 1.2) / (111320 * Math.cos(lat * Math.PI / 180));
+    const nearby = await pool.query(
+      `SELECT * FROM (
+         SELECT ${REPORT_COLUMNS},
+           ROUND(6371000 * 2 * ASIN(SQRT(
+             POWER(SIN(RADIANS(r.latitude::float8 - $3) / 2), 2) +
+             COS(RADIANS($3)) * COS(RADIANS(r.latitude::float8)) *
+             POWER(SIN(RADIANS(r.longitude::float8 - $4) / 2), 2))))::int AS distance_m
+         FROM public.reports r
+         WHERE r.id <> $1 AND r.category = $2 AND r.status <> 'rejected'
+           AND (r.status <> 'resolved' OR r.updated_at >= NOW() - INTERVAL '${NEARBY_RESOLVED_DAYS} days')
+           AND r.latitude BETWEEN $3::float8 - $5 AND $3::float8 + $5
+           AND r.longitude BETWEEN $4::float8 - $6 AND $4::float8 + $6
+       ) candidates
+       WHERE distance_m <= $7
+       ORDER BY distance_m ASC, created_at DESC
+       LIMIT 5`,
+      [id, category, lat, lng, latDelta, lngDelta, NEARBY_RADIUS_M]
+    );
+    res.json({ radius_m: NEARBY_RADIUS_M, items: await storage.withSignedImages(nearby.rows) });
   }));
 
   router.get('/:id/staff', auth('staff'), asyncRoute(async (req, res) => {

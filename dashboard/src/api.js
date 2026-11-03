@@ -127,6 +127,7 @@ export const staffApi = {
   overview: () => api('/stats/overview'),
   reports: (query) => api('/reports/staff', { query: { limit: 25, ...query } }),
   report: (id) => api(`/reports/${encodeURIComponent(id)}/staff`),
+  nearby: (id) => api(`/reports/${encodeURIComponent(id)}/nearby`),
   approve: (id) => api(`/reports/${encodeURIComponent(id)}/approve`, { method: 'PATCH' }),
   correctCategory: (id, category) => api(`/reports/${encodeURIComponent(id)}/category`, {
     method: 'PATCH', body: { category },

@@ -42,7 +42,7 @@ function LocationCorrectionPicker({ latitude, longitude, onChange }) {
   return <div className="field-review-map" ref={container} aria-label="اختر الموقع الصحيح بالضغط على الخريطة" />;
 }
 
-export function DetailDrawer({ id, onClose, onUpdated, onToast }) {
+export function DetailDrawer({ id, onClose, onUpdated, onToast, onOpen }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null);
@@ -54,13 +54,22 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast }) {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [nearby, setNearby] = useState(null);
   const detailMap = useRef(null);
+  const nearbyLayer = useRef(null);
   const mapContainer = useRef(null);
   useEffect(() => {
     let active = true;
     setData(null); setError('');
     staffApi.report(id).then((result) => { if (active) setData(result); })
       .catch((cause) => { if (active) setError(errorText(cause)); });
+    return () => { active = false; };
+  }, [id, tick]);
+  // Possible duplicates load on their own, so a failure never hides the report.
+  useEffect(() => {
+    let active = true;
+    setNearby(null);
+    staffApi.nearby(id).then((result) => { if (active) setNearby(result); }).catch(() => {});
     return () => { active = false; };
   }, [id, tick]);
   useEffect(() => {
@@ -77,8 +86,18 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast }) {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(instance);
     L.circleMarker(point, { radius: 10, color: '#fff', weight: 3, fillColor: '#126477', fillOpacity: 1 }).addTo(instance);
     detailMap.current = instance;
-    return () => { instance.remove(); detailMap.current = null; };
+    nearbyLayer.current = L.layerGroup().addTo(instance);
+    return () => { instance.remove(); detailMap.current = null; nearbyLayer.current = null; };
   }, [data]);
+  useEffect(() => {
+    const layer = nearbyLayer.current;
+    if (!layer) return;
+    layer.clearLayers();
+    (nearby?.items || []).forEach((item) => {
+      L.circleMarker([Number(item.latitude), Number(item.longitude)], { radius: 7, color: '#fff', weight: 2, fillColor: '#e5a93c', fillOpacity: 1 })
+        .bindTooltip(`بلاغ #${item.id} · ${number(item.distance_m)} م`).addTo(layer);
+    });
+  }, [nearby, data]);
   useEffect(() => {
     const onKey = (event) => {
       if (event.key === 'Escape') {
@@ -139,6 +158,8 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast }) {
     finally { setBusy(false); }
   };
   const image = imageUrl(report?.image_url);
+  const nearbyItems = nearby?.items || [];
+  const duplicateReason = (otherId) => `مكرر: سبق الإبلاغ عن المشكلة نفسها في البلاغ #${otherId}.`;
   return <div className="drawer-layer"><button className="drawer-backdrop" aria-label="إغلاق التفاصيل" onClick={onClose} /><aside className="detail-drawer" role="dialog" aria-modal="true" aria-label={`تفاصيل البلاغ ${id}`}>
     <div className="drawer-head"><div><span className="eyebrow">{pending ? 'فحص البلاغ' : 'تفاصيل البلاغ'}</span><h2>بلاغ #{id}</h2></div><div className="drawer-head-actions"><button className="icon-button" aria-label="تحديث تفاصيل البلاغ" title="تحديث التفاصيل" onClick={() => setTick((value) => value + 1)}><RefreshCw size={19} /></button><button className="icon-button" aria-label="إغلاق التفاصيل" onClick={onClose}><X size={20} /></button></div></div>
     {error && <div className="inline-error" role="alert"><CircleAlert size={17} />{error}<button onClick={() => setTick((n) => n + 1)}>تحديث</button></div>}
@@ -152,6 +173,13 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast }) {
       <section className="detail-section"><h4>وصف المشكلة</h4><p>{report.description || 'لم يُضف وصف لهذا البلاغ.'}</p></section>
       {pending && <section className="detail-section"><h4>تصنيف البلاغ قبل الاعتماد</h4><label className="assignment-picker">نوع المشكلة<select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} disabled={verificationOpen}>{Object.entries(categories).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select></label><p>جهة العمل عند الاعتماد: <strong>{agencies[categoryAgency[selectedCategory]]}</strong></p><button className="button button-quiet" disabled={busy || verificationOpen || selectedCategory === report.category} onClick={() => setModal('category')}>حفظ التصنيف</button>{selectedCategory !== report.category && <small>احفظ التصنيف قبل اعتماد البلاغ أو طلب التحقق.</small>}{verificationOpen && <small>أكمل طلب التحقق أو ألغِه قبل تغيير التصنيف.</small>}</section>}
       <section className="detail-section"><h4>الموقع الجغرافي</h4><p className="detail-location"><MapPin size={16} />{report.address_text || 'الموقع محدد بالإحداثيات'}</p><div className="detail-map" ref={mapContainer} /><small className="coordinates">{Number(report.latitude).toFixed(6)}، {Number(report.longitude).toFixed(6)}</small><a className="button button-quiet location-google-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${Number(report.latitude)},${Number(report.longitude)}`)}`} target="_blank" rel="noopener noreferrer"><MapPinned size={16} />فتح الموقع في Google Maps</a></section>
+      {(nearbyItems.length > 0 || (pending && nearby)) && <section className={`detail-section nearby-section ${pending && nearbyItems.length ? 'is-warning' : ''}`} aria-labelledby="nearby-title"><h4 id="nearby-title">بلاغات قريبة من التصنيف نفسه{nearbyItems.length > 0 && <span className="nearby-count">{number(nearbyItems.length)}</span>}</h4>
+        {nearbyItems.length ? <>{pending && <p className="nearby-hint"><CircleAlert size={15} />قد يكون هذا البلاغ مكررًا. قارن الصور والموقع قبل الاعتماد.</p>}<ul className="nearby-list">{nearbyItems.map((item) => <li key={item.id}><button type="button" onClick={() => onOpen?.(item.id)} aria-label={`فتح البلاغ ${item.id}`}>
+          <span className="nearby-thumb">{imageUrl(item.image_url) ? <img src={imageUrl(item.image_url)} alt="" /> : <ImageIcon size={18} />}</span>
+          <span className="nearby-main"><strong>بلاغ #{item.id}</strong><small>على بعد {number(item.distance_m)} م · {fmtDate(item.created_at)}</small>{item.description && <em>{item.description}</em>}</span>
+          <StatusPill report={item} /></button></li>)}</ul><small className="nearby-note">تظهر بلاغات التصنيف نفسه خلال {number(nearby.radius_m)} م التي لم تُرفض، والمحلولة منها خلال آخر 30 يومًا فقط. النقاط الذهبية على الخريطة أعلاه.</small></>
+          : <p className="nearby-empty">لا توجد بلاغات أخرى من التصنيف نفسه خلال {number(nearby.radius_m)} م.</p>}
+      </section>}
       <section className="detail-section"><h4>مقدم البلاغ <span className="private-tag">للموظف فقط</span></h4><div className="info-grid"><div><small>الاسم</small><strong>{report.reporter_name || 'غير محدد'}</strong></div><div><small>رقم الهاتف</small><strong dir="ltr">{report.reporter_phone || '—'}</strong></div></div></section>
       {latestVerification && <section className="detail-section verification-summary"><h4>التحقق الميداني قبل الاعتماد</h4><p>جهة التحقق: <strong>{agencyTeams[latestVerification.agency] || agencies[latestVerification.agency]}</strong></p><p>سبب الطلب: {latestVerification.request_note}</p><small>أُرسل الطلب: {fmtDate(latestVerification.requested_at)}</small><p><strong>{verificationOpen ? (latestVerification.claimed_at ? 'استلم الفريق المهمة، بانتظار النتيجة' : 'بانتظار استلام جهة العمل') : verificationResults[latestVerification.result]}</strong></p>{latestVerification.result_note && <p>ملاحظة النتيجة: {latestVerification.result_note}</p>}{latestVerification.completed_at && <small>وقت الرد: {fmtDate(latestVerification.completed_at)}</small>}</section>}
       {latestVerification?.corrected_at && <section className="detail-section verification-summary"><h4>تصحيح الموقع قبل النشر</h4><p>صحح الموظف موقع البلاغ بعد رد جهة العمل.</p><small>{fmtDate(latestVerification.corrected_at)}</small></section>}
@@ -179,6 +207,7 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast }) {
       <h3>{{ approve: 'اعتماد هذا البلاغ؟', verifyRequest: 'طلب تحقق ميداني قبل النشر؟', verifyCancel: 'إلغاء طلب التحقق؟', verifyLocation: 'تصحيح موقع البلاغ قبل النشر', category: 'تصحيح تصنيف البلاغ؟', reject: 'رفض هذا البلاغ؟', release: 'إعادة البلاغ إلى قائمة جهة العمل؟', completionConfirm: 'تأكيد حل البلاغ؟', completionReturn: 'إعادة البلاغ للعمل؟', fieldContinue: 'متابعة البلاغ؟', fieldCorrect: 'تصحيح موقع البلاغ؟', fieldReject: 'رفض البلاغ بعد المراجعة؟' }[modal]}</h3>
       <p>{{ approve: `سيظهر البلاغ للمواطنين بحالة «جديد»، ويُسند تلقائيًا إلى ${agencies[categoryAgency[report?.category]] || 'جهة العمل المختصة'}.`, verifyRequest: `سيصل طلب التحقق إلى ${agencies[categoryAgency[report?.category]] || 'جهة العمل المختصة'}، ويبقى البلاغ غير منشور حتى تقرر اعتماده أو رفضه.`, verifyCancel: 'سيُغلق طلب التحقق المفتوح، ويمكنك اتخاذ قرار بشأن البلاغ أو إرسال طلب جديد.', category: 'سيُستخدم التصنيف الصحيح لتحديد جهة العمل عند الاعتماد وطلب التحقق الميداني.', reject: report?.approved_at ? 'سيُزال البلاغ من الخريطة العامة، وسيظهر سبب الرفض لصاحبه.' : 'لن يظهر البلاغ على الخريطة العامة، وسيظهر سبب الرفض لصاحبه.', release: report?.status === 'in_progress' ? 'سيُفك البلاغ عن عامله الحالي ويعود إلى قائمة الجهة، وتعود حالته للمواطن «جديد» حتى يبدأ عامل آخر العمل.' : 'سيُفك البلاغ عن عامله الحالي ويعود إلى قائمة الجهة ليستلمه عامل آخر.', completionConfirm: 'راجِع ما أرسله العامل. عند التأكيد ستظهر الحالة للمواطن «تم الحل».', completionReturn: 'سيبقى البلاغ «قيد المعالجة» ويعود للعامل لاستكمال العمل. اكتب سببًا واضحًا.', fieldContinue: 'ستنتهي المراجعة ويعود البلاغ إلى الخريطة والعامل الحالي.', fieldCorrect: 'احرص على إدخال إحداثيات الموقع الصحيح. سيعود البلاغ للعامل الحالي بحالته السابقة.', fieldReject: 'سيُزال البلاغ من الخريطة، وسيظهر سبب الرفض لصاحبه.' }[modal]}</p>
       {['fieldCorrect', 'verifyLocation'].includes(modal) && <><p>اضغط على الموقع الصحيح في الخريطة، أو عدّل الإحداثيات يدويًا. يجب أن يكون داخل نطاق طرابلس المركز.</p><LocationCorrectionPicker latitude={latitude} longitude={longitude} onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng); }} /><div className="field-review-coordinates"><label>خط العرض<input type="number" step="any" min="-90" max="90" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></label><label>خط الطول<input type="number" step="any" min="-180" max="180" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></label></div></>}
+      {modal === 'reject' && nearbyItems.length > 0 && <div className="nearby-reasons"><small>رفض كمكرر:</small>{nearbyItems.slice(0, 3).map((item) => <button type="button" key={item.id} className={reason === duplicateReason(item.id) ? 'is-active' : ''} onClick={() => setReason(duplicateReason(item.id))}>مكرر للبلاغ #{item.id}</button>)}</div>}
       {['reject', 'fieldReject', 'fieldContinue', 'fieldCorrect', 'verifyRequest', 'verifyCancel', 'completionReturn', 'release'].includes(modal) && <label className="reason-label">{['reject', 'fieldReject'].includes(modal) ? 'سبب الرفض' : modal === 'release' ? 'سبب الإعادة' : modal === 'verifyRequest' ? 'سبب طلب التحقق' : modal === 'verifyCancel' ? 'سبب إلغاء الطلب' : modal === 'completionReturn' ? 'سبب إعادة العمل' : 'ملاحظة القرار'} {['reject', 'fieldReject', 'verifyRequest', 'verifyCancel', 'completionReturn', 'release'].includes(modal) && <span>إلزامي</span>}<textarea value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} placeholder={['reject', 'fieldReject'].includes(modal) ? 'اكتب سببًا واضحًا يفهمه مقدم البلاغ' : modal === 'verifyRequest' ? 'ما الذي يحتاج إلى فحص في الموقع؟' : modal === 'verifyCancel' ? 'لماذا أُلغي طلب التحقق؟' : modal === 'completionReturn' ? 'ما الذي يحتاج إلى استكمال؟' : modal === 'release' ? 'مثل: العامل أنهى عقده أو في إجازة' : 'ملاحظة اختيارية للمتابعة الداخلية'} rows={4} /><small>{reason.length}/500</small></label>}
       <div className="modal-actions"><button className={`button ${['reject', 'fieldReject'].includes(modal) ? 'button-danger' : 'button-gold'}`} disabled={busy || (['reject', 'fieldReject', 'verifyRequest', 'verifyCancel', 'completionReturn', 'release'].includes(modal) && !reason.trim()) || (['fieldCorrect', 'verifyLocation'].includes(modal) && (!latitude.trim() || !longitude.trim())) || (modal === 'verifyLocation' && Number(latitude) === Number(report.latitude) && Number(longitude) === Number(report.longitude))} onClick={submitAction}>{busy ? 'جارٍ الحفظ...' : { approve: 'اعتماد البلاغ ونشره بحالة جديد', verifyRequest: 'إرسال طلب التحقق', verifyCancel: 'تأكيد إلغاء الطلب', verifyLocation: 'حفظ الموقع المصحح', category: 'حفظ التصنيف', reject: 'تأكيد الرفض', completionConfirm: 'تأكيد الحل', completionReturn: 'إعادته للعمل', release: 'إعادة إلى قائمة الجهة', fieldContinue: 'متابعة البلاغ', fieldCorrect: 'تأكيد تصحيح الموقع', fieldReject: 'تأكيد الرفض' }[modal]}</button><button className="button button-quiet" disabled={busy} onClick={() => setModal(null)}>إلغاء</button></div>
     </div></div>}

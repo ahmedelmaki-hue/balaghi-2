@@ -377,3 +377,23 @@ button.ov-stat:hover{box-shadow:0 6px 18px rgba(18,50,63,.09);transform:translat
 .acceptance-state{font-size:10px;font-weight:800;white-space:nowrap}
 .acceptance-state.waiting{color:#a76c0c}
 .acceptance-state.accepted{color:#4f6870}
+/* Possible duplicates in the report drawer: same category nearby. */
+.nearby-section.is-warning{border-color:#f0d59c;background:#fffcf4}
+.nearby-count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-inline-start:6px;border-radius:999px;background:#e5a93c;color:#12323f;font-size:11px;font-weight:900}
+.nearby-hint{display:flex;align-items:center;gap:6px;margin:0 0 10px;color:#8a5e08;font-size:12px;font-weight:800}
+.nearby-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.nearby-list button{display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:8px;border:1px solid #eee8de;border-radius:12px;background:#fff;color:#12323f;text-align:right;font:inherit;cursor:pointer}
+.nearby-list button:hover{border-color:#d8d1c3;background:#faf7f1}
+.nearby-list button:focus-visible{outline:2px solid #e5a93c;outline-offset:2px}
+.nearby-thumb{display:grid;place-items:center;width:44px;height:44px;border-radius:9px;overflow:hidden;background:#f5f2ec;color:#7b8689}
+.nearby-thumb img{width:100%;height:100%;object-fit:cover}
+.nearby-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.nearby-main strong{font-size:12px;font-weight:900}
+.nearby-main small{font-size:11px;color:#5f6c6e}
+.nearby-main em{font-style:normal;font-size:11px;color:#5f6c6e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nearby-note{display:block;margin-top:9px;color:#7d8a8d;font-size:10px;line-height:1.7}
+.nearby-empty{margin:0;color:#5f6c6e;font-size:12px}
+.nearby-reasons{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px}
+.nearby-reasons small{color:#5f6c6e;font-size:11px;font-weight:700}
+.nearby-reasons button{padding:5px 10px;border:1px solid #e3dccd;border-radius:999px;background:#fff;color:#12323f;font:inherit;font-size:11px;font-weight:800;cursor:pointer}
+.nearby-reasons button.is-active,.nearby-reasons button:hover{border-color:#c93636;color:#a5281f;background:#fbe9e7}

@@ -1332,3 +1332,38 @@ test('preapproval verification stays private, is limited to the responsible agen
     assert.equal(approved, true);
   });
 });
+
+test('staff see same-category reports near a report; citizens cannot ask', async () => {
+  const queries = [];
+  const pool = {
+    async query(sql, params) {
+      if (sql.includes('FROM public.profiles WHERE id')) {
+        return { rows: [params[0] === citizen.id ? citizen : staff] };
+      }
+      queries.push({ sql, params });
+      if (sql.includes('FROM public.reports WHERE id = $1')) {
+        return { rows: params[0] === '7' ? [{ id: '7', category: 'pothole', latitude: '32.8812', longitude: '13.1910' }] : [] };
+      }
+      if (sql.includes('distance_m')) {
+        return { rows: [{ id: '8', category: 'pothole', status: 'new', approved_at: null, image_path: 'images/8.jpg', distance_m: 38 }] };
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    },
+  };
+  await withServer({ pool, authClientFactory, storage: fakeStorage() }, async (base) => {
+    const asStaff = { headers: { authorization: 'Bearer staff-token' } };
+    const found = await jsonRequest(base, '/api/reports/7/nearby', asStaff);
+    assert.equal(found.status, 200);
+    assert.equal(found.body.radius_m, 100);
+    assert.equal(found.body.items[0].distance_m, 38);
+    assert.equal(found.body.items[0].image_url, 'https://example.test/signed');
+    const search = queries.find((q) => q.sql.includes('distance_m'));
+    assert.deepEqual(search.params.slice(0, 4), ['7', 'pothole', 32.8812, 13.191]);
+    assert.equal(search.params[6], 100);
+    assert.match(search.sql, /r\.status <> 'rejected'/);
+
+    assert.equal((await jsonRequest(base, '/api/reports/9/nearby', asStaff)).status, 404);
+    assert.equal((await jsonRequest(base, '/api/reports/7/nearby',
+      { headers: { authorization: 'Bearer citizen-token' } })).status, 403);
+  });
+});

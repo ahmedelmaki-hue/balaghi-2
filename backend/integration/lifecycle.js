@@ -207,3 +207,35 @@ test('a citizen sends ten reports a Tripoli day, and yesterday does not count', 
     await w.stop();
   }
 });
+
+test('a reviewer sees same-category reports within 100 m as possible duplicates', async () => {
+  const w = await world();
+  try {
+    const send = async (options) => {
+      const created = await w.call('citizen-token', '/reports', { method: 'POST', form: await reportForm(options) });
+      assert.equal(created.status, 201, JSON.stringify(created.body));
+      return created.body.id;
+    };
+    const first = await send({});
+    const second = await send({ at: { latitude: '32.8815', longitude: '13.1912' } }); // about 40 m away
+    const otherKind = await send({ category: 'garbage' });
+    const far = await send({ at: { latitude: '32.8842', longitude: '13.1910' } }); // about 330 m away
+
+    const nearby = await w.call('staff-token', `/reports/${first}/nearby`);
+    assert.equal(nearby.status, 200, JSON.stringify(nearby.body));
+    assert.equal(nearby.body.radius_m, 100);
+    const ids = nearby.body.items.map((item) => item.id);
+    assert.deepEqual(ids, [second]);
+    assert.ok(nearby.body.items[0].distance_m > 20 && nearby.body.items[0].distance_m < 60, nearby.body.items[0].distance_m);
+    assert.ok(!ids.includes(otherKind) && !ids.includes(far));
+
+    // A rejected report is no longer a duplicate to point at.
+    assert.equal((await w.call('staff-token', `/reports/${second}/status`, {
+      method: 'PATCH', body: { status: 'rejected', reason: 'مكرر' },
+    })).status, 200);
+    assert.deepEqual((await w.call('staff-token', `/reports/${first}/nearby`)).body.items, []);
+    assert.equal((await w.call('citizen-token', `/reports/${first}/nearby`)).status, 403);
+  } finally {
+    await w.stop();
+  }
+});

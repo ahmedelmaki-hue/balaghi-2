@@ -111,7 +111,7 @@ export default function App() {
       </div>
       <footer className="main-footer"><span>بلاغي · إدارة البلاغات المدنية</span><span>{pageTitle}</span></footer>
     </main>
-    {selectedId && <DetailDrawer id={String(selectedId)} onClose={() => setSelectedId(null)} onUpdated={() => setRefreshKey((n) => n + 1)} onToast={setToast} />}
+    {selectedId && <DetailDrawer key={String(selectedId)} id={String(selectedId)} onClose={() => setSelectedId(null)} onUpdated={() => setRefreshKey((n) => n + 1)} onToast={setToast} onOpen={setSelectedId} />}
     {passwordModal}
     {toastView}
   </div>;

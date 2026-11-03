@@ -158,12 +158,12 @@ async function photo() {
 // A point inside the Tripoli Center service area.
 const INSIDE = { latitude: '32.8812', longitude: '13.1910' };
 
-async function reportForm({ category = 'pothole', description = 'حفرة للاختبار', requestId = randomUUID() } = {}) {
+async function reportForm({ category = 'pothole', description = 'حفرة للاختبار', requestId = randomUUID(), at = INSIDE } = {}) {
   const form = new FormData();
   form.set('category', category);
   form.set('description', description);
-  form.set('latitude', INSIDE.latitude);
-  form.set('longitude', INSIDE.longitude);
+  form.set('latitude', at.latitude);
+  form.set('longitude', at.longitude);
   form.set('client_request_id', requestId);
   form.set('image', new Blob([await photo()], { type: 'image/jpeg' }), 'report.jpg');
   return form;
