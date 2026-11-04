@@ -56,7 +56,10 @@ function createSmsHookRouter({ secret, resala, templateId }) {
       return res.json({});
     } catch (error) {
       // Never retried: the message may already have gone out.
-      const reason = error instanceof ResalaError ? `${error.status} ${error.type}` : error.message;
+      // Resala's own message says which part it refused (template, sender, number...).
+      const reason = error instanceof ResalaError
+        ? `${error.status} ${error.type}: ${error.message}${error.errors ? ` ${JSON.stringify(error.errors)}` : ''}`
+        : error.message;
       console.warn(`Sign-in code to ${maskedPhone(phone)} not sent: ${reason}`);
       if (error instanceof ResalaError && ['InsufficientCredit', 'AccountExpired'].includes(error.type)) {
         console.error('Resala account cannot send: top up the balance or renew the account.');
