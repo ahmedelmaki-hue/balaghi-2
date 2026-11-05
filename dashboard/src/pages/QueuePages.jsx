@@ -1,28 +1,53 @@
 // The review queues and the full report list.
 import React, { useEffect, useState } from 'react';
 import {
-  CheckCheck, ChevronLeft, ChevronRight, CircleAlert, Eye, MapPin, Menu, RefreshCw, Search,
+  CheckCheck, ChevronLeft, ChevronRight, CircleAlert, Clock3, Copy, Eye, MapPin, Menu, RefreshCw, Search,
 } from 'lucide-react';
 import { staffApi } from '../api.js';
-import { categories, fmtDate, number, reportSearchId, categoryName, errorText, CategoryIcon, StatusPill, AcceptanceState, VerificationState, ReportThumbnail, EmptyState, LoadingState, PageHeading, ReportTable } from '../shared.jsx';
+import { categories, fmtDate, number, reportSearchId, categoryName, errorText, CategoryIcon, VerificationState, ReportThumbnail, EmptyState, LoadingState, PageHeading, ReportTable } from '../shared.jsx';
+
+const relativeTime = new Intl.RelativeTimeFormat('ar-LY', { numeric: 'auto' });
+const clockTime = new Intl.DateTimeFormat('ar-LY', { timeStyle: 'short' });
+const tripoliDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Tripoli' });
+const DAY_MS = 24 * 3600e3;
+
+// "قبل 3 ساعات", "أمس": how long a report has waited.
+function since(value) {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
+  if (minutes < 60) return relativeTime.format(-minutes, 'minute');
+  if (minutes < 60 * 24) return relativeTime.format(-Math.round(minutes / 60), 'hour');
+  return relativeTime.format(-Math.round(minutes / 1440), 'day');
+}
+
+// Section headings: اليوم، أمس، أقدم — by the Tripoli calendar day.
+function dayGroup(value) {
+  const day = tripoliDay.format(new Date(value));
+  if (day === tripoliDay.format(new Date())) return 'اليوم';
+  if (day === tripoliDay.format(new Date(Date.now() - DAY_MS))) return 'أمس';
+  return 'أقدم';
+}
 
 export function PendingReviewPage({ fieldReviewQueue = false, completionQueue = false, onOpen, refreshKey, onMenu }) {
   const defaultSort = 'newest';
   const queueFilter = completionQueue ? { completion: 'pending' }
     : fieldReviewQueue ? { field_review: 'pending' } : { review: 'pending' };
-  const heading = completionQueue ? 'بانتظار تأكيد الحل'
-    : fieldReviewQueue ? 'بلاغات تحتاج مراجعة ميدانية' : 'قائمة البلاغات بانتظار المراجعة';
+  const reviewQueue = !fieldReviewQueue && !completionQueue;
+  const heading = completionQueue ? 'بانتظار تأكيد الحل' : fieldReviewQueue ? 'تحتاج مراجعة موظف' : 'بانتظار المراجعة';
   const subtitle = fieldReviewQueue ? 'راجع ملاحظة العامل واتخذ قرارًا قبل عودة البلاغ إلى الخريطة.'
     : completionQueue ? 'راجع إنجاز جهة العمل ثم أكّد الحل أو أعد البلاغ للعمل مع سبب.'
       : 'افحص صورة كل بلاغ ووصفه وموقعه قبل اعتماده ونشره للمواطنين.';
+  const timeOf = (report) => (completionQueue ? report.completion_submitted_at
+    : fieldReviewQueue ? report.field_issue_raised_at : report.created_at) || report.created_at;
   const [filters, setFilters] = useState({ category: '', date: '', sort: defaultSort, report_id: '', page: 1 });
   const [search, setSearch] = useState('');
   const [searchError, setSearchError] = useState('');
   const [counts, setCounts] = useState(null);
   const [result, setResult] = useState(null);
+  const [nearby, setNearby] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tick, setTick] = useState(0);
+  const [loadedAt, setLoadedAt] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => setTick((value) => value + 1), 30000);
@@ -50,7 +75,13 @@ export function PendingReviewPage({ fieldReviewQueue = false, completionQueue = 
           setFilters((current) => ({ ...current, page: Math.max(data.total_pages, 1) }));
           return;
         }
-        setResult(data); setError(''); setLoading(false);
+        setResult(data); setError(''); setLoading(false); setLoadedAt(new Date());
+        // Possible duplicates, only before approval: one light lookup per report on the page.
+        if (reviewQueue) {
+          Promise.all(data.items.map((report) => staffApi.nearby(report.id)
+            .then((found) => [report.id, found.items[0] || null]).catch(() => [report.id, null])))
+            .then((pairs) => { if (active) setNearby(Object.fromEntries(pairs)); });
+        }
       })
       .catch((cause) => { if (active) { setError(errorText(cause)); setLoading(false); } });
     return () => { active = false; };
@@ -72,23 +103,74 @@ export function PendingReviewPage({ fieldReviewQueue = false, completionQueue = 
     setSearchError('');
     change('report_id', id);
   };
+  const filtered = Boolean(filters.category || filters.date || filters.report_id || filters.sort !== defaultSort);
   const start = result?.total ? (result.page - 1) * 10 + 1 : 0;
   const end = result?.total ? Math.min(result.page * 10, result.total) : 0;
+  const groups = [];
+  (result?.items || []).forEach((report) => {
+    const label = dayGroup(timeOf(report));
+    const last = groups[groups.length - 1];
+    if (last?.label === label) last.items.push(report); else groups.push({ label, items: [report] });
+  });
+  const action = completionQueue ? 'مراجعة الإنجاز' : fieldReviewQueue ? 'مراجعة الملاحظة' : 'فحص واتخاذ قرار';
+  const ActionIcon = completionQueue ? CheckCheck : fieldReviewQueue ? CircleAlert : Eye;
 
-  return <>
-    <header className="pending-heading"><div className="pending-heading-copy"><button className="icon-button mobile-menu" aria-label="فتح القائمة" onClick={onMenu}><Menu size={22} /></button><div><span className="eyebrow">{completionQueue ? 'اعتماد الإصلاح' : fieldReviewQueue ? 'الملاحظات الميدانية' : 'مراجعة البلاغات'}</span><h1>{heading} <span>{counts ? `(${number(counts.all)} بلاغ)` : ''}</span></h1><p>{subtitle}</p></div></div><button className="button button-quiet" onClick={() => setTick((value) => value + 1)}><RefreshCw size={17} />تحديث القائمة</button></header>
-    <section className="panel pending-filters" aria-label='تصفية البلاغات المنتظرة'><div className="pending-category-tabs">
-      {[['', 'الكل', 'all'], ...Object.entries(categories).map(([key, item]) => [key, item.label, key])].map(([key, label, countKey]) => <button key={countKey} className={`pending-tab ${filters.category === key ? 'active' : ''}`} onClick={() => change('category', key)} aria-pressed={filters.category === key}><span>{label}</span>{counts && <small>{number(counts[countKey] || 0)}</small>}</button>)}
-    </div><div className="pending-controls"><form className="pending-search" onSubmit={submitSearch}><Search size={17} /><input type="search" inputMode="numeric" value={search} onChange={(event) => { setSearch(event.target.value); setSearchError(''); if (!event.target.value && filters.report_id) change('report_id', ''); }} placeholder="ابحث برقم البلاغ" aria-label="ابحث برقم البلاغ" /><button type="submit">بحث</button></form><label>{completionQueue ? 'تاريخ إرسال الإنجاز' : fieldReviewQueue ? 'تاريخ الملاحظة' : 'تاريخ تقديم البلاغ'}<input type="date" value={filters.date} onChange={(event) => change('date', event.target.value)} /></label><label>الترتيب<select value={filters.sort} onChange={(event) => change('sort', event.target.value)}><option value="newest">الأحدث أولًا</option><option value="oldest">الأقدم أولًا</option></select></label><button className="pending-reset" onClick={reset}>إعادة ضبط</button></div>
-      {searchError && <p className="pending-search-error" role="alert">{searchError}</p>}
+  return <div className="pr">
+    <header className="pr-head">
+      <div className="pr-title">
+        <button className="icon-button mobile-menu" aria-label="فتح القائمة" onClick={onMenu}><Menu size={22} /></button>
+        <div><span className="eyebrow">{completionQueue ? 'اعتماد الإصلاح' : fieldReviewQueue ? 'الملاحظات الميدانية' : 'مراجعة البلاغات'}</span>
+          <h1>{heading}{counts && <span className="pr-count num">{number(counts.all)}</span>}</h1>
+          <p>{subtitle}</p></div>
+      </div>
+      <button type="button" className="pr-refresh" onClick={() => setTick((value) => value + 1)}>
+        <RefreshCw size={16} />{loadedAt ? <>تحديث · <span className="num">{clockTime.format(loadedAt)}</span></> : 'تحديث'}
+      </button>
+    </header>
+
+    <section className="pr-toolbar" aria-label="تصفية البلاغات المنتظرة">
+      <div className="pr-tabs" role="group" aria-label="التصنيف">
+        {[['', 'الكل', 'all'], ...Object.entries(categories).map(([key, item]) => [key, item.label, key])].map(([key, label, countKey]) => <button type="button" key={countKey} className={filters.category === key ? 'is-active' : ''} onClick={() => change('category', key)} aria-pressed={filters.category === key}>{label}{counts && <small className="num">{number(counts[countKey] || 0)}</small>}</button>)}
+      </div>
+      <div className="pr-controls">
+        <form className="pr-search" onSubmit={submitSearch} role="search"><Search size={16} /><input type="search" inputMode="numeric" value={search} onChange={(event) => { setSearch(event.target.value); setSearchError(''); if (!event.target.value && filters.report_id) change('report_id', ''); }} placeholder="رقم البلاغ" aria-label="ابحث برقم البلاغ" /><button type="submit">بحث</button></form>
+        <label className="pr-field"><span>{completionQueue ? 'تاريخ الإنجاز' : fieldReviewQueue ? 'تاريخ الملاحظة' : 'تاريخ الإرسال'}</span><input type="date" value={filters.date} onChange={(event) => change('date', event.target.value)} /></label>
+        <label className="pr-field"><span>الترتيب</span><select value={filters.sort} onChange={(event) => change('sort', event.target.value)}><option value="newest">الأحدث أولًا</option><option value="oldest">الأقدم أولًا</option></select></label>
+        {filtered && <button type="button" className="pr-reset" onClick={reset}>مسح</button>}
+      </div>
+      {searchError && <p className="pr-search-error" role="alert">{searchError}</p>}
     </section>
-    <section className="panel pending-results"><div className="panel-heading"><div><span className="eyebrow">{completionQueue ? 'طلبات الإنجاز' : fieldReviewQueue ? 'قائمة المراجعة الميدانية' : 'قائمة الفحص'}</span><h2>{completionQueue ? 'بلاغات أنجزتها جهة العمل وتنتظر قرارك' : fieldReviewQueue ? 'بلاغات أوقفها العامل للمراجعة' : 'بلاغات تحتاج قرارًا فرديًا'}</h2></div><span className="count-chip">{number(result?.total || 0)} نتيجة</span></div>
-      {loading ? <LoadingState /> : error ? <EmptyState icon={CircleAlert} title="تعذّر تحميل البلاغات" detail={error} onRetry={() => setTick((value) => value + 1)} /> : !result?.items.length ? <EmptyState title={completionQueue ? 'لا توجد بلاغات بانتظار تأكيد الحل' : fieldReviewQueue ? 'لا توجد ملاحظات ميدانية معلّقة' : 'لا توجد بلاغات مطابقة'} detail={filters.report_id ? 'رقم البلاغ غير موجود ضمن هذه القائمة.' : completionQueue ? 'ستظهر هنا البلاغات التي يؤكد العامل إنجازها.' : fieldReviewQueue ? 'ستظهر هنا البلاغات التي يبلّغ العامل عن وجود مشكلة فيها.' : 'جرّب تغيير عوامل التصفية أو انتظر وصول بلاغات جديدة.'} /> : <>
-        <div className="table-scroll"><table className="pending-table"><thead><tr><th>رقم البلاغ</th><th>صورة المعاينة</th><th>التصنيف والوصف</th><th>الموقع</th><th>{completionQueue ? 'وقت إرسال الإنجاز' : fieldReviewQueue ? 'وقت الملاحظة' : 'وقت الإرسال'}</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>{result.items.map((report) => <tr key={report.id}><td><strong className="pending-report-id">#{report.id}</strong></td><td><button className="pending-photo-button" onClick={() => onOpen(report.id)} aria-label={`عرض تفاصيل البلاغ ${report.id}`}><ReportThumbnail report={report} /></button></td><td><div className="pending-description"><span><CategoryIcon category={report.category} size={17} /><strong>{categoryName(report.category)}</strong></span><p>{report.description || 'لا يوجد وصف إضافي.'}</p></div></td><td><span className="pending-location"><MapPin size={15} />{report.address_text || 'الموقع محدد على الخريطة'}</span></td><td className="pending-date">{fmtDate(completionQueue ? report.completion_submitted_at : fieldReviewQueue ? report.field_issue_raised_at : report.created_at)}</td><td><span className="status-stack"><StatusPill report={report} /><VerificationState report={report} /><AcceptanceState report={report} /></span></td><td><button className="pending-review-button" onClick={() => onOpen(report.id)}>{completionQueue ? <CheckCheck size={16} /> : fieldReviewQueue ? <CircleAlert size={16} /> : <Eye size={16} />}{completionQueue ? 'مراجعة الإنجاز' : fieldReviewQueue ? 'مراجعة الملاحظة' : 'فحص واتخاذ قرار'}</button></td></tr>)}</tbody></table></div>
-        <div className="pagination pending-pagination"><span>عرض {number(start)}–{number(end)} من {number(result.total)} بلاغ</span><div><button className="icon-button" aria-label="الصفحة السابقة" disabled={filters.page <= 1} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}><ChevronRight size={18} /></button><span>صفحة {number(result.page)} من {number(Math.max(result.total_pages, 1))}</span><button className="icon-button" aria-label="الصفحة التالية" disabled={filters.page >= result.total_pages} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}><ChevronLeft size={18} /></button></div></div>
-      </>}
-    </section>
-  </>;
+
+    {loading ? <LoadingState /> : error ? <EmptyState icon={CircleAlert} title="تعذّر تحميل البلاغات" detail={error} onRetry={() => setTick((value) => value + 1)} /> : !result?.items.length ? <EmptyState title={completionQueue ? 'لا توجد بلاغات بانتظار تأكيد الحل' : fieldReviewQueue ? 'لا توجد ملاحظات ميدانية معلّقة' : 'لا توجد بلاغات مطابقة'} detail={filters.report_id ? 'رقم البلاغ غير موجود ضمن هذه القائمة.' : 'ستظهر هنا البلاغات فور وصولها.'} /> : <>
+      {groups.map((group) => <section className="pr-group" key={group.label} aria-label={group.label}>
+        <h2>{group.label}<small className="num">{number(group.items.length)}</small></h2>
+        <ol className="pr-list">{group.items.map((report) => {
+          const waitedLong = Date.now() - new Date(timeOf(report)).getTime() > DAY_MS;
+          const twin = nearby[report.id];
+          return <li key={report.id} className={`pr-item is-${report.category}`}>
+            <button type="button" className="pr-photo" onClick={() => onOpen(report.id)} aria-label={`عرض تفاصيل البلاغ ${report.id}`}><ReportThumbnail report={report} /></button>
+            <div className="pr-main">
+              <div className="pr-meta">
+                <span className="pr-tag"><CategoryIcon category={report.category} size={14} />{categoryName(report.category)}</span>
+                <span className="pr-id num">#{report.id}</span>
+                <time className={waitedLong ? 'is-late' : ''} dateTime={timeOf(report)} title={fmtDate(timeOf(report))}><Clock3 size={13} />{since(timeOf(report))}</time>
+              </div>
+              <p className={`pr-desc ${report.description ? '' : 'is-empty'}`}>{report.description || 'لم يُضف المواطن وصفًا.'}</p>
+              <p className="pr-place"><MapPin size={14} />{report.address_text || 'الموقع محدد على الخريطة'}</p>
+              {(twin || report.verification_requested_at) && <div className="pr-flags">
+                <VerificationState report={report} />
+                {twin && <span className="pr-twin"><Copy size={13} /><span>قد يكون مكررًا: بلاغ <bdi className="num">#{twin.id}</bdi> على بعد <bdi className="num">{number(twin.distance_m)}</bdi> م</span></span>}
+              </div>}
+            </div>
+            <div className="pr-side">
+              <button type="button" className="pr-action" onClick={() => onOpen(report.id)}><ActionIcon size={17} />{action}</button>
+            </div>
+          </li>;
+        })}</ol>
+      </section>)}
+      <footer className="pr-pages"><span>عرض <span className="num">{number(start)}–{number(end)}</span> من <span className="num">{number(result.total)}</span></span><div><button className="icon-button" aria-label="الصفحة السابقة" disabled={filters.page <= 1} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}><ChevronRight size={18} /></button><span>صفحة <span className="num">{number(result.page)}</span> من <span className="num">{number(Math.max(result.total_pages, 1))}</span></span><button className="icon-button" aria-label="الصفحة التالية" disabled={filters.page >= result.total_pages} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}><ChevronLeft size={18} /></button></div></footer>
+    </>}
+  </div>;
 }
 
 export function ReportsPage({ pendingOnly, onOpen, refreshKey, onMenu }) {
