@@ -1,41 +1,65 @@
-// The staff map of every non-rejected report.
+// The staff map of every non-rejected report, beside a list of what is in view.
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
-  ArrowLeft, CircleAlert, Clock3, MapPin, MapPinned, Minus, Plus, RefreshCw, X,
+  ArrowLeft, CircleAlert, Clock3, Crosshair, MapPin, Menu, Minus, Plus, RefreshCw,
 } from 'lucide-react';
 import { staffApi } from '../api.js';
-import { fmtDate, number, categoryName, errorText, StatusPill, ReportThumbnail, PageHeading } from '../shared.jsx';
+import { categories, fmtDate, number, categoryName, errorText, CategoryIcon, StatusPill, ReportThumbnail } from '../shared.jsx';
+
+const TRIPOLI = [32.8872, 13.1913];
+const relativeTime = new Intl.RelativeTimeFormat('ar-LY', { numeric: 'auto' });
+const clockTime = new Intl.DateTimeFormat('ar-LY', { timeStyle: 'short' });
+function since(value) {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
+  if (minutes < 60) return relativeTime.format(-minutes, 'minute');
+  if (minutes < 60 * 24) return relativeTime.format(-Math.round(minutes / 60), 'hour');
+  return relativeTime.format(-Math.round(minutes / 1440), 'day');
+}
+
+// The category icon drawn inside each pin, so a pin is not told apart by colour
+// alone. Shapes from Lucide (ISC licence), the same icons the dashboard uses.
+const PIN_ICONS = {
+  pothole: '<rect x="2" y="6" width="20" height="8" rx="1"/><path d="M17 14v7"/><path d="M7 14v7"/><path d="M17 3v3"/><path d="M7 3v3"/><path d="M10 14 2.3 6.3"/><path d="m14 6 7.7 7.7"/><path d="m8 6 8 8"/>',
+  water_leak: '<path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/>',
+  garbage: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+};
+const pinHtml = (report, stage, state) => `<span class="mp-pin is-${stage} ${state}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PIN_ICONS[report.category] || ''}</svg></span>`;
+
+const STAGES = [
+  { value: '', label: 'الكل' },
+  { value: 'pending', label: 'بانتظار المراجعة' },
+  { value: 'new', label: 'جديد' },
+  { value: 'in_progress', label: 'قيد المعالجة' },
+  { value: 'resolved', label: 'تم الحل' },
+];
 
 export function MapPage({ onOpen, refreshKey, onMenu }) {
   const container = useRef(null);
   const map = useRef(null);
   const markerLayer = useRef(null);
+  const listRef = useRef(null);
   const [bounds, setBounds] = useState('');
   const [category, setCategory] = useState('');
   const [status, setStatus] = useState('');
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+  const [hoverId, setHoverId] = useState(null);
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [detailError, setDetailError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [truncated, setTruncated] = useState(false);
   const [tick, setTick] = useState(0);
-  const mapStatus = (report) => !report.approved_at ? 'pending' : report.status;
-  const filtered = status ? items.filter((report) => mapStatus(report) === status) : items;
-  const statusFilters = [
-    { value: '', label: 'الكل', count: items.length },
-    { value: 'pending', label: 'بانتظار المراجعة', count: items.filter((item) => mapStatus(item) === 'pending').length },
-    { value: 'new', label: 'جديد', count: items.filter((item) => mapStatus(item) === 'new').length },
-    { value: 'in_progress', label: 'قيد المعالجة', count: items.filter((item) => mapStatus(item) === 'in_progress').length },
-    { value: 'resolved', label: 'تم الحل', count: items.filter((item) => mapStatus(item) === 'resolved').length },
-  ];
-  const selected = filtered.find((report) => report.id === selectedId);
-  const resetView = () => map.current?.setView([32.8872, 13.1913], 12);
+  const [loadedAt, setLoadedAt] = useState(null);
+  const stageOf = (report) => (!report.approved_at ? 'pending' : report.status);
+  const filtered = status ? items.filter((report) => stageOf(report) === status) : items;
+  const countOf = (value) => (value ? items.filter((item) => stageOf(item) === value).length : items.length);
+  const resetView = () => map.current?.setView(TRIPOLI, 13);
+
   useEffect(() => {
-    if (!container.current || map.current) return;
-    const instance = L.map(container.current, { zoomControl: false }).setView([32.8872, 13.1913], 12);
+    if (!container.current || map.current) return undefined;
+    const instance = L.map(container.current, { zoomControl: false }).setView(TRIPOLI, 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
     }).addTo(instance);
@@ -46,8 +70,9 @@ export function MapPage({ onOpen, refreshKey, onMenu }) {
     updateBounds();
     return () => { instance.off('moveend', updateBounds); instance.remove(); map.current = null; markerLayer.current = null; };
   }, []);
+
   useEffect(() => {
-    if (!bounds || !markerLayer.current) return;
+    if (!bounds || !markerLayer.current) return undefined;
     let active = true;
     const load = async () => {
       setLoading(true);
@@ -60,28 +85,38 @@ export function MapPage({ onOpen, refreshKey, onMenu }) {
           cursor = data.next_cursor;
         } while (cursor && loaded.length < 5000 && active);
         if (!active) return;
-        setItems(loaded); setTruncated(Boolean(cursor)); setError('');
+        setItems(loaded); setTruncated(Boolean(cursor)); setError(''); setLoadedAt(new Date());
       } catch (cause) { if (active) setError(errorText(cause)); }
       finally { if (active) setLoading(false); }
     };
     load();
     return () => { active = false; };
   }, [bounds, category, refreshKey, tick]);
+
   useEffect(() => {
     const layer = markerLayer.current;
     if (!layer) return;
     layer.clearLayers();
     filtered.forEach((report) => {
-      const tone = mapStatus(report) === 'in_progress' ? 'in-progress' : mapStatus(report);
+      const state = selectedId === report.id ? 'is-selected' : hoverId === report.id ? 'is-hover' : '';
       const marker = L.marker([Number(report.latitude), Number(report.longitude)], {
-        icon: L.divIcon({ className: '', html: `<span class="map-marker ${tone} ${selectedId === report.id ? 'is-selected' : ''}"><span></span></span>`, iconSize: [42, 48], iconAnchor: [21, 44] }),
+        icon: L.divIcon({ className: '', html: pinHtml(report, stageOf(report), state), iconSize: [36, 44], iconAnchor: [18, 42] }),
+        keyboard: true, title: `بلاغ ${report.id} · ${categoryName(report.category)}`,
+        zIndexOffset: state ? 1000 : 0,
       });
       marker.on('click', () => setSelectedId(report.id));
       marker.addTo(layer);
     });
-  }, [items, status, selectedId]);
+  }, [items, status, selectedId, hoverId]);
+
+  // A pin picked on the map scrolls its row into view in the list.
   useEffect(() => {
-    if (!selectedId) { setSelectedDetail(null); setDetailError(''); return; }
+    if (!selectedId) return;
+    listRef.current?.querySelector(`[data-report="${selectedId}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) { setSelectedDetail(null); setDetailError(''); return undefined; }
     let active = true;
     setSelectedDetail(null); setDetailError('');
     staffApi.report(selectedId)
@@ -89,19 +124,75 @@ export function MapPage({ onOpen, refreshKey, onMenu }) {
       .catch((cause) => { if (active) setDetailError(errorText(cause)); });
     return () => { active = false; };
   }, [selectedId, refreshKey]);
-  return <><PageHeading eyebrow="الموقع الجغرافي" title="الخريطة التفاعلية للبلاغات" subtitle="تابع مواقع البلاغات في النطاق المعروض، بما فيها البلاغات المنتظرة للمراجعة الداخلية." action="تحديث الخريطة" onAction={() => setTick((n) => n + 1)} onMenu={onMenu} />
-    <section className="map-workspace">
-      <div className="map-workspace-head"><div><strong><MapPin size={19} />{truncated ? `${number(items.length)}+` : number(items.length)} بلاغ في النطاق المعروض</strong><span>تظهر البلاغات المنتظرة للموظفين فقط، وتبقى خريطة المواطن للبلاغات المعتمدة.</span></div><div className="map-head-actions"><label>التصنيف<select value={category} onChange={(e) => { setCategory(e.target.value); setSelectedId(null); }}><option value="">جميع التصنيفات</option><option value="pothole">الحفر</option><option value="water_leak">تسرب مياه</option><option value="garbage">قمامة</option></select></label><button className="button button-quiet" onClick={() => { setCategory(''); setStatus(''); setSelectedId(null); resetView(); }}><RefreshCw size={15} />إعادة الضبط</button></div></div>
-      <div className="map-filter-bar" role="group" aria-label="تصفية البلاغات حسب الحالة">{statusFilters.map((filter) => <button key={filter.value} className={`map-filter-chip ${filter.value || 'all'} ${status === filter.value ? 'active' : ''}`} aria-pressed={status === filter.value} onClick={() => { setStatus(filter.value); setSelectedId(null); }}><i />{filter.label}<b>{number(filter.count)}</b></button>)}</div>
-      {error && <div className="inline-error" role="alert"><CircleAlert size={17} />{error}<button onClick={() => setTick((n) => n + 1)}>إعادة المحاولة</button></div>}
-      {truncated && <div className="inline-note">يوجد أكثر من ٥٠٠٠ بلاغ في هذا النطاق. قرّب الخريطة لعرض البقية.</div>}
-      <div className="map-shell map-dashboard-shell"><div className="map-canvas" ref={container} aria-label="خريطة البلاغات للموظفين" />
-        <div className="map-floating-controls"><button aria-label="تكبير الخريطة" onClick={() => map.current?.zoomIn()}><Plus size={19} /></button><button aria-label="تصغير الخريطة" onClick={() => map.current?.zoomOut()}><Minus size={19} /></button><button className="map-reset-view" onClick={resetView} title="العودة إلى طرابلس"><MapPinned size={18} /></button></div>
-        {loading && <span className="map-loading"><span className="spinner" />جارٍ تحديث البلاغات...</span>}
-        {!loading && !error && filtered.length === 0 && <span className="map-empty">لا توجد بلاغات بهذه الحالة في النطاق المعروض.</span>}
-        {selected && <div className="map-selected"><button className="map-selected-close" aria-label="إغلاق المعاينة" onClick={() => setSelectedId(null)}><X size={18} /></button><div className="map-preview-heading"><span className="eyebrow">معاينة البلاغ #{selected.id}</span><StatusPill report={selectedDetail || selected} /></div><div className="map-preview-body"><ReportThumbnail key={selected.id} report={selectedDetail || selected} /><div><strong>{categoryName(selected.category)}</strong><p>{selectedDetail?.description || 'جارٍ تحميل وصف البلاغ...'}</p><small><MapPin size={13} />{selectedDetail?.address_text || `${Number(selected.latitude).toFixed(5)}، ${Number(selected.longitude).toFixed(5)}`}</small><small><Clock3 size={13} />{fmtDate(selected.created_at)}</small></div></div>{detailError && <small className="map-preview-error">{detailError}</small>}<button className="button button-navy" onClick={() => onOpen(selected.id)}>فتح تفاصيل البلاغ<ArrowLeft size={17} /></button></div>}
-      </div>
-    </section>
-  </>;
-}
 
+  const pick = (report) => {
+    setSelectedId(report.id);
+    map.current?.panTo([Number(report.latitude), Number(report.longitude)], { animate: true });
+  };
+
+  return <div className="mp">
+    <header className="pr-head">
+      <div className="pr-title">
+        <button className="icon-button mobile-menu" aria-label="فتح القائمة" onClick={onMenu}><Menu size={22} /></button>
+        <div><span className="eyebrow">الموقع الجغرافي</span>
+          <h1>خريطة البلاغات<span className="pr-count num">{truncated ? `${number(items.length)}+` : number(items.length)}</span></h1>
+          <p>البلاغات في النطاق المعروض، بما فيها المنتظرة للمراجعة. المواطن يرى المعتمدة فقط.</p></div>
+      </div>
+      <button type="button" className="pr-refresh" onClick={() => setTick((n) => n + 1)}>
+        <RefreshCw size={16} />{loadedAt ? <>تحديث · <span className="num">{clockTime.format(loadedAt)}</span></> : 'تحديث'}
+      </button>
+    </header>
+
+    <section className="rl-filters mp-filters" aria-label="تصفية الخريطة">
+      <div className="rl-stages" role="group" aria-label="المرحلة">
+        {STAGES.map((stage) => <button type="button" key={stage.value || 'all'} className={`${status === stage.value ? 'is-active' : ''} ${stage.value ? `is-${stage.value === 'in_progress' ? 'progress' : stage.value}` : ''}`} aria-pressed={status === stage.value} onClick={() => { setStatus(stage.value); setSelectedId(null); }}>
+          {stage.value && <i className="rl-dot" aria-hidden="true" />}{stage.label}<small className="num">{number(countOf(stage.value))}</small>
+        </button>)}
+      </div>
+      <label className="pr-field"><span>التصنيف</span><select value={category} onChange={(event) => { setCategory(event.target.value); setSelectedId(null); }}><option value="">الكل</option>{Object.entries(categories).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select></label>
+    </section>
+
+    {error && <div className="inline-error" role="alert"><CircleAlert size={17} />{error}<button onClick={() => setTick((n) => n + 1)}>إعادة المحاولة</button></div>}
+    {truncated && <div className="inline-note">يوجد أكثر من ٥٠٠٠ بلاغ في هذا النطاق. قرّب الخريطة لعرض البقية.</div>}
+
+    <div className="mp-body">
+      <aside className="mp-list" aria-label="البلاغات في النطاق المعروض">
+        <h2>في النطاق المعروض<small className="num">{number(filtered.length)}</small></h2>
+        {filtered.length === 0 ? <p className="mp-list-empty">{loading ? 'جارٍ تحميل البلاغات…' : 'لا توجد بلاغات بهذه الحالة هنا. حرّك الخريطة أو غيّر الفلتر.'}</p>
+          : <ol ref={listRef}>{filtered.map((report) => {
+            const open = selectedId === report.id;
+            return <li key={report.id} data-report={report.id} className={open ? 'is-open' : ''}>
+              <button type="button" className="mp-row" onClick={() => (open ? setSelectedId(null) : pick(report))} onMouseEnter={() => setHoverId(report.id)} onMouseLeave={() => setHoverId(null)} onFocus={() => setHoverId(report.id)} onBlur={() => setHoverId(null)} aria-expanded={open}>
+                <span className={`mp-row-icon is-${stageOf(report)}`}><CategoryIcon category={report.category} size={16} /></span>
+                <span className="mp-row-main"><strong><span className="num">#{report.id}</span> · {categoryName(report.category)}</strong><small><Clock3 size={12} />{since(report.created_at)}</small></span>
+                <StatusPill report={report} />
+              </button>
+              {open && <div className="mp-preview">
+                <ReportThumbnail key={report.id} report={selectedDetail || report} />
+                <div>
+                  <p>{selectedDetail ? (selectedDetail.description || 'لم يُضف المواطن وصفًا.') : 'جارٍ تحميل التفاصيل…'}</p>
+                  <small><MapPin size={13} />{selectedDetail?.address_text || 'الموقع محدد على الخريطة'}</small>
+                  <small><Clock3 size={13} />{fmtDate(report.created_at)}</small>
+                  {detailError && <small className="mp-preview-error">{detailError}</small>}
+                </div>
+                <button type="button" className="rl-open" onClick={() => onOpen(report.id)}>فتح تفاصيل البلاغ<ArrowLeft size={16} /></button>
+              </div>}
+            </li>;
+          })}</ol>}
+      </aside>
+
+      <div className="mp-map">
+        <div className="mp-canvas" ref={container} aria-label="خريطة البلاغات للموظفين" />
+        <div className="mp-controls" role="group" aria-label="التحكم بالخريطة">
+          <button type="button" aria-label="تكبير الخريطة" onClick={() => map.current?.zoomIn()}><Plus size={18} /></button>
+          <button type="button" aria-label="تصغير الخريطة" onClick={() => map.current?.zoomOut()}><Minus size={18} /></button>
+          <button type="button" aria-label="العودة إلى طرابلس المركز" title="العودة إلى طرابلس المركز" onClick={resetView}><Crosshair size={18} /></button>
+        </div>
+        {loading && <span className="mp-loading"><span className="spinner" />جارٍ التحديث…</span>}
+        <p className="mp-legend" aria-label="ألوان الحالات على الخريطة">
+          <span><i className="rl-dot is-pending" />بانتظار المراجعة</span><span><i className="rl-dot is-new" />جديد</span><span><i className="rl-dot is-progress" />قيد المعالجة</span><span><i className="rl-dot is-resolved" />تم الحل</span>
+        </p>
+      </div>
+    </div>
+  </div>;
+}

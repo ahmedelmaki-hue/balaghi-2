@@ -550,3 +550,61 @@ button.ov-stat:hover{box-shadow:0 6px 18px rgba(18,50,63,.09);transform:translat
 }
 
 @media(max-width:900px){.rl-table tbody tr:not(.rl-detail)>td{width:auto;min-width:0}.rl-table tbody tr:not(.rl-detail){grid-template-columns:auto minmax(0,1fr)}.rl-place{max-width:none}}
+
+/* Map — the list of reports in view beside the map, kept in step with it
+   (after 21st's Interactive Globe Explorer and Map Controls). Pins carry the
+   category icon as well as the status colour, so colour is never the only cue. */
+.mp{--pr-ink:#12323f;--pr-muted:#5b6a6f;--pr-line:#ebe5d9;--pr-rule:#f2eee6;--pr-control:#d8d1c3;--pr-hover:#faf7f1;
+  display:flex;flex-direction:column;gap:16px;color:var(--pr-ink)}
+.mp .num{font-variant-numeric:tabular-nums}
+.mp button:focus-visible,.mp select:focus-visible{outline:3px solid #e5a93c;outline-offset:2px}
+.mp-filters{flex-direction:row;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.mp-legend .rl-dot.is-pending{background:#d99a1e}.mp-legend .rl-dot.is-new{background:#c93636}.mp-legend .rl-dot.is-progress{background:#2d8bc4}.mp-legend .rl-dot.is-resolved{background:#4b9a67}
+.mp-body{display:grid;grid-template-columns:360px minmax(0,1fr);gap:16px;height:calc(100vh - 290px);min-height:560px}
+
+.mp-list{display:flex;flex-direction:column;min-height:0;border:1px solid var(--pr-line);border-radius:16px;background:#fff;overflow:hidden}
+.mp-list h2{display:flex;align-items:center;gap:8px;margin:0;padding:14px 16px;border-bottom:1px solid var(--pr-rule);font-size:15px;font-weight:800}
+.mp-list h2 small{display:inline-grid;place-items:center;min-width:26px;height:22px;padding:0 8px;border-radius:999px;background:#f1ede5;font-size:12px}
+.mp-list ol{list-style:none;margin:0;padding:6px;overflow-y:auto;flex:1}
+.mp-list li{border-radius:12px}
+.mp-list li+li{margin-top:2px}
+.mp-list li.is-open{background:#fffaf0;box-shadow:inset 0 0 0 1px #f0d59c}
+.mp-row{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;min-height:56px;padding:8px 10px;border:0;border-radius:12px;background:transparent;color:inherit;font:inherit;text-align:right;cursor:pointer}
+.mp-row:hover{background:var(--pr-hover)}
+.mp-list li.is-open .mp-row:hover{background:transparent}
+.mp-row-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;color:#fff;background:#9aa6a8}
+.mp-row-icon .category-icon{width:auto;height:auto;background:transparent;color:inherit}
+.mp-row-icon.is-pending{background:#d99a1e}.mp-row-icon.is-new{background:#c93636}.mp-row-icon.is-in_progress{background:#2d8bc4}.mp-row-icon.is-resolved{background:#4b9a67}
+.mp-row-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mp-row-main strong{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-row-main small{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--pr-muted)}
+.mp-row .status-pill{font-size:11px}
+.mp-preview{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;padding:2px 12px 12px}
+.mp-preview .report-thumb{width:72px;height:72px;border-radius:10px}
+.mp-preview>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.mp-preview p{margin:0;font-size:14px;font-weight:600;line-height:1.6;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.mp-preview small{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--pr-muted)}
+.mp-preview small svg{color:#be820e;flex:none}
+.mp-preview-error{color:#a5281f!important}
+.mp-preview .rl-open{grid-column:1/-1;justify-content:center;height:42px;margin:4px 0 0}
+.mp-list-empty{margin:16px;padding:14px;border:1px dashed var(--pr-control);border-radius:12px;color:var(--pr-muted);font-size:14px;line-height:1.7}
+
+.mp-map{position:relative;min-height:0;border:1px solid var(--pr-line);border-radius:16px;overflow:hidden;background:#eef0ea}
+.mp-canvas{position:absolute;inset:0}
+.mp-controls{position:absolute;z-index:500;top:12px;left:12px;display:flex;flex-direction:column;border:1px solid var(--pr-control);border-radius:12px;background:#fff;box-shadow:0 4px 12px rgba(18,50,63,.12);overflow:hidden}
+.mp-controls button{display:grid;place-items:center;width:44px;height:44px;border:0;background:#fff;color:var(--pr-ink);cursor:pointer}
+.mp-controls button+button{border-top:1px solid var(--pr-rule)}
+.mp-controls button:hover{background:var(--pr-hover)}
+.mp-loading{position:absolute;z-index:500;top:12px;right:12px;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:#fff;box-shadow:0 4px 12px rgba(18,50,63,.12);font-size:13px;font-weight:700}
+.mp-legend{position:absolute;z-index:500;bottom:14px;right:14px;display:flex;flex-wrap:wrap;gap:12px;margin:0;padding:8px 14px;border:1px solid var(--pr-control);border-radius:12px;background:#fff;box-shadow:0 4px 12px rgba(18,50,63,.1);font-size:13px;color:var(--pr-muted)}
+.mp-legend span{display:inline-flex;align-items:center;gap:6px}
+
+.mp-pin{display:grid;place-items:center;width:34px;height:34px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);border:3px solid #fff;background:#9aa6a8;color:#fff;box-shadow:0 4px 10px rgba(18,50,63,.3);transition:transform .15s}
+.mp-pin svg{transform:rotate(45deg)}
+.mp-pin.is-pending{background:#d99a1e}.mp-pin.is-new{background:#c93636}.mp-pin.is-in_progress{background:#2d8bc4}.mp-pin.is-resolved{background:#4b9a67}
+.mp-pin.is-hover{transform:rotate(-45deg) scale(1.15)}
+.mp-pin.is-selected{transform:rotate(-45deg) scale(1.25);border-color:#12323f;box-shadow:0 0 0 4px rgba(229,169,60,.6),0 6px 14px rgba(18,50,63,.35)}
+
+@media(max-width:1100px){.mp-body{grid-template-columns:1fr;height:auto}.mp-map{order:-1;height:60vh;min-height:380px}.mp-list{max-height:none}.mp-list ol{overflow:visible}}
+@media(max-width:720px){.mp-filters{flex-direction:column;align-items:stretch}.mp-filters .pr-field{width:100%}.mp-legend{left:14px;right:auto;bottom:10px;gap:8px;font-size:12px;padding:6px 10px}.mp-map{height:56vh}}
+@media(prefers-reduced-motion:reduce){.mp-pin{transition:none}}
