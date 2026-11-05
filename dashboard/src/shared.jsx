@@ -1,7 +1,7 @@
 // Labels, permission rules, formatting helpers and small components every screen shares.
 import React, { useState } from 'react';
 import {
-  ArrowUpLeft, BarChart3, CheckCheck, ChevronLeft, ChevronRight, CircleAlert, Construction, Contact, Droplets, FileClock, History, LayoutDashboard, MapPin, MapPinned, Menu, RefreshCw, ShieldCheck, Trash2, Users,
+  BarChart3, CheckCheck, ChevronLeft, ChevronRight, CircleAlert, Construction, Contact, Droplets, FileClock, History, LayoutDashboard, MapPinned, Menu, RefreshCw, ShieldCheck, Trash2, Users,
 } from 'lucide-react';
 import { ApiError, imageUrl } from './api.js';
 
@@ -198,18 +198,6 @@ export function PageHeading({ eyebrow, title, subtitle, action, onAction, onMenu
       <div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{subtitle}</p></div></div>
     {action && <button className="button button-quiet refresh-action" onClick={onAction}><RefreshCw size={17} />{action}</button>}
   </header>;
-}
-
-export function ReportTable({ items, onOpen, compact = false }) {
-  return <div className="table-scroll"><table className="report-table"><thead><tr><th>البلاغ</th><th>التصنيف</th><th>الموقع</th><th>تاريخ الإرسال</th><th>الحالة</th><th aria-label="عرض التفاصيل" /></tr></thead>
-    <tbody>{items.map((report) => <tr key={report.id} onClick={() => onOpen(report.id)}>
-      <td><div className="report-identity"><ReportThumbnail report={report} /><span><strong>بلاغ #{report.id}</strong><small>{report.reporter_name || 'مواطن'}</small></span></div></td>
-      <td><span className="category-cell"><CategoryIcon category={report.category} size={16} />{categoryName(report.category)}</span></td>
-      <td className="location-cell"><MapPin size={15} />{report.address_text || 'موقع محدد على الخريطة'}</td>
-      <td className="date-cell">{fmtDate(report.created_at)}</td>
-      <td><span className="status-stack"><StatusPill report={report} /><AcceptanceState report={report} /></span></td>
-      <td><button className="table-open" aria-label={`عرض تفاصيل البلاغ ${report.id}`} onClick={(e) => { e.stopPropagation(); onOpen(report.id); }}><ArrowUpLeft size={17} /></button></td>
-    </tr>)}</tbody></table>{compact && items.length === 0 && <EmptyState title="لا توجد بلاغات بانتظار المراجعة" detail="ستظهر البلاغات الجديدة هنا فور إرسالها." />}</div>;
 }
 
 export const agencyNames = {
