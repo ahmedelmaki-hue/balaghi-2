@@ -125,6 +125,7 @@ export function imageUrl(value) {
 
 export const staffApi = {
   overview: () => api('/stats/overview'),
+  insights: () => api('/stats/insights'),
   reports: (query) => api('/reports/staff', { query: { limit: 25, ...query } }),
   report: (id) => api(`/reports/${encodeURIComponent(id)}/staff`),
   nearby: (id) => api(`/reports/${encodeURIComponent(id)}/nearby`),

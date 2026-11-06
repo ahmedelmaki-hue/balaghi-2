@@ -1394,3 +1394,26 @@ test('a new report gets its street name after the response is sent', async () =>
     assert.deepEqual(addressWrites[0].slice(0, 2), ['1', 'شارع عمر المختار']);
   });
 });
+
+test('the statistics insights come back in one request, for staff only', async () => {
+  const pool = {
+    async query(sql, params) {
+      if (sql.includes('FROM public.profiles WHERE id')) return { rows: [params[0] === citizen.id ? citizen : staff] };
+      if (sql.includes('generate_series')) return { rows: [{ day: '2026-11-05', count: 3 }, { day: '2026-11-06', count: 1 }] };
+      if (sql.includes('AS stage')) return { rows: [{ category: 'pothole', stage: 'pending', count: 2 }, { category: 'pothole', stage: 'resolved', count: 5 }] };
+      if (sql.includes('accepted_at IS NULL')) return { rows: [{ total: 4 }] };
+      if (sql.includes('percentile_cont')) return { rows: [{ approve: '62.4567', claim: null, start: 30 }] };
+      throw new Error(`Unexpected SQL: ${sql}`);
+    },
+  };
+  await withServer({ pool, authClientFactory, storage: fakeStorage() }, async (base) => {
+    const insights = await jsonRequest(base, '/api/stats/insights', { headers: { authorization: 'Bearer staff-token' } });
+    assert.equal(insights.status, 200);
+    assert.deepEqual(insights.body.days, [{ day: '2026-11-05', count: 3 }, { day: '2026-11-06', count: 1 }]);
+    assert.equal(insights.body.breakdown.length, 2);
+    assert.equal(insights.body.unclaimed, 4);
+    assert.deepEqual(insights.body.median_minutes, { approve: 62.5, claim: null, start: 30 });
+    assert.equal((await jsonRequest(base, '/api/stats/insights',
+      { headers: { authorization: 'Bearer citizen-token' } })).status, 403);
+  });
+});
