@@ -737,3 +737,77 @@ button.ov-stat:hover{box-shadow:0 6px 18px rgba(18,50,63,.09);transform:translat
 @media(max-width:1200px){.st-cats{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.st-cats{grid-template-columns:1fr}.st-cat-stages li{grid-template-columns:104px minmax(0,1fr) 26px}}
 @media(prefers-reduced-motion:reduce){.st-cat{transition:none}.st-cat:hover{transform:none}}
+
+/* Staff and worker accounts — one row per account so long lists stay easy to scan
+   (after 21st's Team Members Table); on phones each row folds into a short card. */
+.ac-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ac-create{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px;border:0;border-radius:12px;background:#e5a93c;color:#12323f;font:inherit;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(190,130,14,.25)}
+.ac-create:hover{background:#dc9e2c}
+.ac-search input{width:190px}
+.ac-segment{display:inline-flex;gap:2px;height:44px;padding:3px;border:1px solid var(--pr-control);border-radius:10px;background:#faf8f3}
+.ac-segment button{min-width:64px;padding:0 14px;border:0;border-radius:7px;background:transparent;color:var(--pr-muted);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.ac-segment button:hover{color:var(--pr-ink)}
+.ac-segment button.is-active{background:#fff;color:var(--pr-ink);box-shadow:0 1px 3px rgba(18,50,63,.14)}
+
+.ac-table{width:100%;border-collapse:collapse;text-align:right}
+.ac-table thead th{position:sticky;top:0;z-index:1;padding:12px 16px;background:#faf8f3;border-bottom:1px solid var(--pr-line);color:var(--pr-muted);font-size:13px;font-weight:800;white-space:nowrap}
+.ac-table tbody td{padding:12px 16px;border-bottom:1px solid var(--pr-rule);font-size:14px;vertical-align:middle}
+.ac-table tbody tr:last-child td{border-bottom:0}
+.ac-table tbody tr:hover>td{background:var(--pr-hover)}
+.ac-table tr.is-off>td{background:#fbfaf7}
+.ac-table tr.is-off .ac-who strong{color:#5b6a6f}
+.ac-who{display:flex;align-items:center;gap:12px;min-width:0}
+.ac-who>span{display:flex;flex-direction:column;gap:1px;min-width:0}
+.ac-who strong{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;line-height:1.4;white-space:nowrap}
+.ac-who small{font-size:12px;color:var(--pr-muted);text-align:right;font-family:ui-monospace,Consolas,monospace}
+.ac-self{flex:none;padding:2px 8px;border-radius:999px;background:#fff3d5;color:#8a5e08;font-size:11px;font-weight:800}
+.ac-tags{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.ac-role{font-size:14px;font-weight:800;color:#111;white-space:nowrap}
+.ac-sub{max-width:280px;font-size:12px;color:var(--pr-muted);line-height:1.5}
+.ac-state{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.ac-status{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;font-size:13px;font-weight:800;white-space:nowrap}
+.ac-status i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.ac-status.is-on{background:#e8f3ec;color:#2f7148}
+.ac-status.is-off{background:#efefec;color:#5b6a6f}
+.ac-flag{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#8a5e08;white-space:nowrap}
+.ac-table td[data-cell="role"]{min-width:220px}
+.ac-table th,.ac-table td{padding-inline:14px}
+.ac-reason{max-width:220px;font-size:12px;color:var(--pr-muted);line-height:1.5}
+.ac-date{color:var(--pr-muted);font-size:13px;white-space:nowrap}
+.ac-label{display:none}
+.ac-actions{display:flex;justify-content:flex-end;gap:6px}
+.ac-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 10px;border:1px solid var(--pr-control);border-radius:10px;background:#fff;color:var(--pr-ink);font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.ac-btn svg{flex:none}
+.ac-btn:hover{background:var(--pr-hover)}
+.ac-btn.is-danger{border-color:#efc4bf;color:#a5281f}
+.ac-btn.is-danger:hover{background:#fbe9e7}
+.ac-btn.is-go{border-color:#b9dbc5;color:#2f7148}
+.ac-btn.is-go:hover{background:#e8f3ec}
+.ac button:focus-visible{outline:3px solid #e5a93c;outline-offset:2px}
+
+@media(max-width:1100px){.ac-actions{flex-wrap:wrap}}
+@media(max-width:900px){
+  .ac-table thead{display:none}
+  .ac-table,.ac-table tbody,.ac-table td{display:block;width:100%}
+  .ac-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"account status" "role role" "password password" "actions actions";gap:10px 12px;padding:14px;border-bottom:1px solid var(--pr-rule)}
+  .ac-table tbody tr:last-child{border-bottom:0}
+  .ac-table tbody td{padding:0;border:0;background:transparent!important}
+  .ac-table td[data-cell="account"]{grid-area:account}
+  .ac-table td[data-cell="status"]{grid-area:status}
+  .ac-table td[data-cell="status"] .ac-state{align-items:flex-end}
+  .ac-table td[data-cell="role"]{grid-area:role}
+  .ac-table td[data-cell="role"] .ac-tags{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 10px}
+  .ac-table td[data-cell="password"]{grid-area:password;font-size:12px;white-space:normal}
+  .ac-label{display:inline}
+  .ac-table td[data-cell="actions"]{grid-area:actions}
+  .ac-actions{flex-wrap:nowrap}
+  .ac-btn{flex:1 1 auto;min-width:0;height:42px;padding:0 8px}
+  .ac-table td[data-cell="role"],.ac-table td[data-cell="status"]{min-width:0}
+  .ac-table td[data-cell="status"] .ac-reason{text-align:left;max-width:150px}
+}
+@media(max-width:720px){
+  .ac-head-actions{width:100%}.ac-head-actions>*{flex:1;justify-content:center}
+  .ac .rl-controls{display:grid;grid-template-columns:1fr}
+  .ac-search input{width:100%;min-width:0;flex:1}
+  .ac-segment button{flex:1}
+}

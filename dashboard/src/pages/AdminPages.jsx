@@ -1,7 +1,8 @@
 // Account administration: staff and workers, citizens, and the audit log.
 import React, { useEffect, useState } from 'react';
 import {
-  Ban, CircleAlert, Contact, Copy, History, KeyRound, Pencil, RotateCcw, Search, UserCog, UserPlus, Users,
+  Ban, ChevronLeft, ChevronRight, CircleAlert, Contact, Copy, History,
+  KeyRound, Menu, Pencil, RefreshCw, RotateCcw, Search, UserCog, UserPlus, Users,
 } from 'lucide-react';
 import { adminApi } from '../api.js';
 import { permissionNames, manageableRoles, accountsLabel, roleNames, auditActions, accountRoleName, fmtDate, number, errorText, EmptyState, LoadingState, PageHeading, agencyNames, localPhone, ModalShell, Pagination } from '../shared.jsx';
@@ -44,6 +45,40 @@ function AccountStatus({ account }) {
   </span>;
 }
 
+const ROLE_PLURAL = { admin: 'المسؤولون', staff: 'الموظفون', field_worker: 'العمال الميدانيون' };
+const clockTime = new Intl.DateTimeFormat('ar-LY', { hour: 'numeric', minute: '2-digit' });
+const dayOnly = new Intl.DateTimeFormat('ar-LY', { dateStyle: 'medium' });
+
+function AccountRow({ item, user, onAction }) {
+  const self = item.id === user.id;
+  const canEdit = !item.is_owner || self;
+  const canReset = !self && (!item.is_owner || user.is_owner);
+  const canStatus = !self && !item.is_owner;
+  const name = item.full_name || item.staff_username;
+  return <tr className={item.is_active ? '' : 'is-off'}>
+    <td data-cell="account"><div className="ac-who">
+      <span><strong>{item.full_name || '—'}{self && <b className="ac-self">أنت</b>}</strong><small dir="ltr">{item.staff_username}</small></span>
+    </div></td>
+    <td data-cell="role"><div className="ac-tags">
+      <span className="ac-role">{accountRoleName(item)}</span>
+      {item.agency && <small className="ac-sub">{agencyNames[item.agency]}</small>}
+      {item.role === 'admin' && !item.is_owner && <small className="ac-sub">{item.admin_permissions?.length
+        ? item.admin_permissions.map((key) => permissionNames[key]).join('، ') : 'مراجعة البلاغات فقط'}</small>}
+    </div></td>
+    <td data-cell="status"><div className="ac-state">
+      <span className={`ac-status ${item.is_active ? 'is-on' : 'is-off'}`}><i />{item.is_active ? 'نشط' : 'معطّل'}</span>
+      {item.is_active && item.must_change_password && <small className="ac-flag"><KeyRound size={13} />بانتظار تغيير كلمة المرور</small>}
+      {!item.is_active && item.deactivated_reason && <small className="ac-reason">{item.deactivated_reason}</small>}
+    </div></td>
+    <td data-cell="password" className="ac-date"><span className="ac-label">آخر تغيير لكلمة المرور: </span>{item.password_changed_at ? <time dateTime={item.password_changed_at} title={fmtDate(item.password_changed_at)}>{dayOnly.format(new Date(item.password_changed_at))}</time> : 'لم تُغيّر بعد'}</td>
+    <td data-cell="actions"><div className="ac-actions">
+      {canEdit && <button type="button" className="ac-btn" aria-label={`تعديل ${name}`} onClick={() => onAction('edit', item)}><Pencil size={15} />تعديل</button>}
+      {canReset && <button type="button" className="ac-btn" aria-label={`إعادة تعيين كلمة مرور ${name}`} onClick={() => onAction('reset', item)}><KeyRound size={15} />كلمة المرور</button>}
+      {canStatus && <button type="button" className={`ac-btn ${item.is_active ? 'is-danger' : 'is-go'}`} aria-label={`${item.is_active ? 'تعطيل' : 'إعادة تفعيل'} ${name}`} onClick={() => onAction('status', item)}>{item.is_active ? <><Ban size={15} />تعطيل</> : <><RotateCcw size={15} />إعادة التفعيل</>}</button>}
+    </div></td>
+  </tr>;
+}
+
 export function AccountsPage({ user, onMenu, onToast }) {
   const empty = { role: '', status: '', search: '', page: 1 };
   const [filters, setFilters] = useState(empty);
@@ -58,6 +93,16 @@ export function AccountsPage({ user, onMenu, onToast }) {
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
   const { result, loading, error } = usePagedList(adminApi.users, filters, tick);
+  const [roleCount, setRoleCount] = useState({});
+  const [loadedAt, setLoadedAt] = useState(null);
+  useEffect(() => {
+    let active = true;
+    Promise.all(['', ...roles].map((role) => adminApi.users({ role, limit: 1 }).then((data) => [role, data.total])))
+      .then((pairs) => { if (active) setRoleCount(Object.fromEntries(pairs)); })
+      .catch(() => { if (active) setRoleCount({}); });
+    return () => { active = false; };
+  }, [tick, roles.join()]);
+  useEffect(() => { if (result) setLoadedAt(new Date()); }, [result]);
   const change = (key, value) => setFilters((current) => ({ ...current, [key]: value, page: 1 }));
   const open = (type, account = null) => {
     setModal({ type, account }); setFormError(''); setReason('');
@@ -113,33 +158,48 @@ export function AccountsPage({ user, onMenu, onToast }) {
   };
   const submitSearch = (event) => { event.preventDefault(); change('search', search.trim()); };
   const account = modal?.account;
-  return <>
-    <PageHeading eyebrow="إدارة الحسابات" title={accountsLabel(user)} subtitle={`أنشئ حسابات ${roles.map((role) => ({ staff: 'الموظفين', field_worker: 'العمال الميدانيين', admin: 'المسؤولين' })[role]).join(' و')}، وعطّلها أو أعد تعيين كلمات مرورها.`} action="تحديث القائمة" onAction={() => setTick((n) => n + 1)} onMenu={onMenu} />
-    {notice && <div className="inline-note" role="status">{notice}</div>}
-    <section className="panel reports-panel">
-      <div className="panel-heading"><div><span className="eyebrow">حسابات اللوحة</span><h2>كل الحسابات</h2></div><button className="button button-gold" onClick={() => open('create')}><UserPlus size={17} />حساب جديد</button></div>
-      <div className="reports-search-row"><form className="pending-search reports-search" onSubmit={submitSearch}><Search size={17} /><input type="search" value={search} onChange={(e) => { setSearch(e.target.value); if (!e.target.value && filters.search) change('search', ''); }} placeholder="ابحث بالاسم أو اسم المستخدم" aria-label="ابحث بالاسم أو اسم المستخدم" /><button type="submit">بحث</button></form></div>
-      <div className="filters">
-        <label>الدور<select value={filters.role} onChange={(e) => change('role', e.target.value)}><option value="">كل الأدوار</option>{roles.map((role) => <option key={role} value={role}>{roleNames[role]}</option>)}</select></label>
-        <label>الحالة<select value={filters.status} onChange={(e) => change('status', e.target.value)}><option value="">الكل</option><option value="active">نشط</option><option value="inactive">معطّل</option></select></label>
-        {(filters.role || filters.status || filters.search) && <button className="clear-filters" onClick={() => { setFilters(empty); setSearch(''); }}>مسح الفلاتر</button>}
+  return <div className="rl ac">
+    <header className="pr-head">
+      <div className="pr-title">
+        <button className="icon-button mobile-menu" aria-label="فتح القائمة" onClick={onMenu}><Menu size={22} /></button>
+        <div><span className="eyebrow">إدارة الحسابات</span>
+          <h1>{accountsLabel(user)}{roleCount[''] !== undefined && <span className="pr-count num">{number(roleCount[''])}</span>}</h1>
+          <p>{`أنشئ حسابات ${roles.map((role) => ({ staff: 'الموظفين', field_worker: 'العمال الميدانيين', admin: 'المسؤولين' })[role]).join(' و')}، وعطّلها أو أعد تعيين كلمات مرورها.`}</p></div>
       </div>
-      {loading && !result ? <LoadingState /> : error ? <EmptyState icon={CircleAlert} title="تعذّر تحميل الحسابات" detail={error} onRetry={() => setTick((n) => n + 1)} />
-        : !result?.items.length ? <EmptyState icon={Users} title="لا توجد حسابات مطابقة" detail="غيّر الفلاتر أو أنشئ حسابًا جديدًا." />
-          : <><div className="table-scroll"><table className="report-table admin-table"><thead><tr><th>الحساب</th><th>الدور</th><th>الحالة</th><th>آخر تغيير لكلمة المرور</th><th>الإجراءات</th></tr></thead>
-            <tbody>{result.items.map((item) => <tr key={item.id}>
-              <td><span className="account-identity"><strong>{item.full_name || '—'}{item.id === user.id && <b className="self-tag">أنت</b>}</strong><small dir="ltr">{item.staff_username}</small></span></td>
-              <td><span className="account-identity"><strong>{accountRoleName(item)}</strong>{item.agency && <small>{agencyNames[item.agency]}</small>}{item.role === 'admin' && !item.is_owner && <small>{item.admin_permissions?.length ? item.admin_permissions.map((key) => permissionNames[key]).join('، ') : 'مراجعة البلاغات فقط'}</small>}</span></td>
-              <td><AccountStatus account={item} /></td>
-              <td className="date-cell">{item.password_changed_at ? fmtDate(item.password_changed_at) : 'لم تُغيّر بعد'}</td>
-              <td><span className="admin-actions">
-                {(!item.is_owner || item.id === user.id) && <button className="icon-button" title="تعديل" aria-label={`تعديل ${item.staff_username}`} onClick={() => open('edit', item)}><Pencil size={16} /></button>}
-                {item.id !== user.id && (!item.is_owner || user.is_owner) && <button className="icon-button" title="إعادة تعيين كلمة المرور" aria-label={`إعادة تعيين كلمة مرور ${item.staff_username}`} onClick={() => open('reset', item)}><KeyRound size={16} /></button>}
-                {item.id !== user.id && !item.is_owner && <button className={`icon-button ${item.is_active ? 'danger-icon' : ''}`} title={item.is_active ? 'تعطيل الحساب' : 'إعادة التفعيل'} aria-label={`${item.is_active ? 'تعطيل' : 'تفعيل'} ${item.staff_username}`} onClick={() => open('status', item)}>{item.is_active ? <Ban size={16} /> : <RotateCcw size={16} />}</button>}
-              </span></td>
-            </tr>)}</tbody></table></div>
-            <Pagination result={result} page={filters.page} setPage={(page) => setFilters((current) => ({ ...current, page }))} /></>}
+      <div className="ac-head-actions">
+        <button type="button" className="pr-refresh" onClick={() => setTick((n) => n + 1)}>
+          <RefreshCw size={16} />{loadedAt ? <>تحديث · <span className="num">{clockTime.format(loadedAt)}</span></> : 'تحديث'}
+        </button>
+        <button type="button" className="ac-create" onClick={() => open('create')}><UserPlus size={17} />حساب جديد</button>
+      </div>
+    </header>
+    {notice && <div className="inline-note" role="status">{notice}</div>}
+
+    <section className="rl-filters" aria-label="تصفية الحسابات">
+      <div className="rl-stages" role="group" aria-label="الدور">
+        {['', ...roles].map((role) => <button type="button" key={role || 'all'} className={filters.role === role ? 'is-active' : ''} aria-pressed={filters.role === role} onClick={() => change('role', role)}>
+          {role ? ROLE_PLURAL[role] : 'كل الحسابات'}{roleCount[role] !== undefined && <small className="num">{number(roleCount[role])}</small>}
+        </button>)}
+      </div>
+      <div className="rl-controls">
+        <form className="pr-search ac-search" onSubmit={submitSearch} role="search"><Search size={16} /><input type="search" value={search} onChange={(e) => { setSearch(e.target.value); if (!e.target.value && filters.search) change('search', ''); }} placeholder="الاسم أو اسم المستخدم" aria-label="ابحث بالاسم أو اسم المستخدم" /><button type="submit">بحث</button></form>
+        <div className="ac-segment" role="group" aria-label="الحالة">
+          {[['', 'الكل'], ['active', 'نشط'], ['inactive', 'معطّل']].map(([key, label]) => <button type="button" key={key || 'all'} className={filters.status === key ? 'is-active' : ''} aria-pressed={filters.status === key} onClick={() => change('status', key)}>{label}</button>)}
+        </div>
+        {(filters.role || filters.status || filters.search) && <span className="rl-active"><button type="button" onClick={() => { setFilters(empty); setSearch(''); }}>مسح الفلاتر</button></span>}
+      </div>
     </section>
+
+    {loading && !result ? <LoadingState /> : error ? <EmptyState icon={CircleAlert} title="تعذّر تحميل الحسابات" detail={error} onRetry={() => setTick((n) => n + 1)} />
+      : !result?.items.length ? <div className="rl-card rl-empty"><EmptyState icon={Users} title="لا توجد حسابات مطابقة" detail="غيّر الفلاتر أو أنشئ حسابًا جديدًا." /></div>
+        : <>
+          <section className="rl-card"><div className="rl-scroll"><table className="ac-table">
+            <thead><tr><th scope="col">الحساب</th><th scope="col">الدور والجهة</th><th scope="col">الحالة</th><th scope="col">كلمة المرور غُيّرت</th><th scope="col"><span className="sr-only">الإجراءات</span></th></tr></thead>
+            <tbody>{result.items.map((item) => <AccountRow key={item.id} item={item} user={user} onAction={open} />)}</tbody>
+          </table></div>
+          {result.total_pages > 1 && <footer className="pr-pages"><span>صفحة <span className="num">{number(result.page)}</span> من <span className="num">{number(result.total_pages)}</span> · <span className="num">{number(result.total)}</span> حساب</span><div><button className="icon-button" aria-label="الصفحة السابقة" disabled={filters.page <= 1} onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}><ChevronRight size={18} /></button><button className="icon-button" aria-label="الصفحة التالية" disabled={filters.page >= result.total_pages} onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}><ChevronLeft size={18} /></button></div></footer>}
+          </section>
+        </>}
     {modal?.type === 'password' && <TemporaryPasswordModal title={modal.title} username={modal.username} password={modal.password} onClose={() => setModal(null)} />}
     {['create', 'edit'].includes(modal?.type) && <ModalShell label={modal.type === 'create' ? 'حساب جديد' : 'تعديل الحساب'} icon={modal.type === 'create' ? UserPlus : UserCog} onClose={close}>
       <h3>{modal.type === 'create' ? 'حساب جديد' : 'تعديل الحساب'}</h3>
@@ -170,7 +230,7 @@ export function AccountsPage({ user, onMenu, onToast }) {
       {formError && <div className="form-error" role="alert"><CircleAlert size={17} />{formError}</div>}
       <div className="modal-actions"><button className="button button-gold" disabled={busy} onClick={submit}>إعادة التعيين</button><button className="button button-quiet" disabled={busy} onClick={close}>إلغاء</button></div>
     </ModalShell>}
-  </>;
+  </div>;
 }
 
 export function CitizensPage({ onMenu, onToast }) {
