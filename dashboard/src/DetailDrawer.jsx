@@ -159,6 +159,8 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast, onOpen }) {
   };
   const image = imageUrl(report?.image_url);
   const nearbyItems = nearby?.items || [];
+  const repairs = (data?.completions || []).filter((item) => item.after_image_url);
+  const repairDecision = (item) => (item.decision === 'confirmed' ? 'مؤكد' : item.decision === 'returned' ? 'أُعيد للعمل' : 'بانتظار قرارك');
   const duplicateReason = (otherId) => `مكرر: سبق الإبلاغ عن المشكلة نفسها في البلاغ #${otherId}.`;
   return <div className="drawer-layer"><button className="drawer-backdrop" aria-label="إغلاق التفاصيل" onClick={onClose} /><aside className="detail-drawer dd" role="dialog" aria-modal="true" aria-label={`تفاصيل البلاغ ${id}`}>
     <div className="drawer-head dd-head"><div><span className="eyebrow">{pending ? 'فحص البلاغ' : 'تفاصيل البلاغ'}</span><h2>بلاغ #{id}{report && <span className="dd-head-cat">{categoryName(report.category)}</span>}</h2>{report && <small className="dd-head-date">أُرسل {fmtDate(report.created_at)}</small>}</div><div className="drawer-head-actions">{report && <StatusPill report={report} />}<button className="icon-button" aria-label="تحديث تفاصيل البلاغ" title="تحديث التفاصيل" onClick={() => setTick((value) => value + 1)}><RefreshCw size={19} /></button><button className="icon-button" aria-label="إغلاق التفاصيل" onClick={onClose}><X size={20} /></button></div></div>
@@ -184,13 +186,24 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast, onOpen }) {
         <p>أبلغ {pendingCompletion.worker_name || pendingCompletion.worker_username || 'العامل الميداني'} بإتمام العمل.{pendingCompletion.note && <> وصف العمل: {pendingCompletion.note}</>}</p><small>وقت الإرسال: {fmtDate(pendingCompletion.submitted_at)}</small>
       </section>}
 
-      {data.completions?.some((item) => item.after_image_url) ? <section className="detail-section completion-evidence"><h4>صور الإصلاح للمراجعة</h4><div className="completion-photo-compare"><div><strong>قبل الإصلاح · صورة البلاغ</strong><button type="button" onClick={() => { setExpandedImage(image); setZoom(1); }}><img src={image} alt="صورة المشكلة قبل الإصلاح" /></button></div>{data.completions.filter((item) => item.after_image_url).map((item) => <div key={item.id}><strong>بعد الإصلاح · {item.decision === 'confirmed' ? 'مؤكد' : item.decision === 'returned' ? 'أُعيد للعمل' : 'بانتظار القرار'}</strong><button type="button" onClick={() => { setExpandedImage(imageUrl(item.after_image_url)); setZoom(1); }}><img src={imageUrl(item.after_image_url)} alt={`صورة الإصلاح المرسلة في ${fmtDate(item.submitted_at)}`} /></button><small>أُرسلت: {fmtDate(item.submitted_at)}</small>{item.photo_latitude !== null && item.photo_longitude !== null ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${item.photo_latitude},${item.photo_longitude}`)}`} target="_blank" rel="noopener noreferrer"><MapPin size={14} />موقع الجهاز عند التصوير{item.photo_accuracy_m !== null ? ` · دقة تقريبية ${Math.round(Number(item.photo_accuracy_m))} م` : ''}</a> : <small>لم يتوفر موقع الجهاز عند التصوير.</small>}</div>)}</div><p className="completion-evidence-hint">قارن الصورتين والموقع قبل تأكيد الحل؛ الصورة وحدها لا تثبت اكتمال العمل.</p></section> : null}
+      {repairs.length > 0 && <section className="dd-block dd-repair" aria-labelledby="dd-repair-title"><h4 id="dd-repair-title">صور الإصلاح</h4>
+        <div className="dd-compare">
+          <figure><button type="button" className="dd-photo" onClick={() => { if (image) { setExpandedImage(image); setZoom(1); } }} disabled={!image} aria-label="عرض صورة البلاغ قبل الإصلاح">{image ? <img src={image} alt="صورة المشكلة قبل الإصلاح" /> : <span><ImageIcon size={28} />لا توجد صورة</span>}</button>
+            <figcaption><span><strong>قبل</strong> · صورة البلاغ</span><small>{fmtDate(report.created_at)}</small></figcaption></figure>
+          <figure><button type="button" className="dd-photo" onClick={() => { setExpandedImage(imageUrl(repairs[0].after_image_url)); setZoom(1); }} aria-label="عرض صورة الإصلاح"><img src={imageUrl(repairs[0].after_image_url)} alt={`صورة الإصلاح المرسلة في ${fmtDate(repairs[0].submitted_at)}`} /></button>
+            <figcaption><span><strong>بعد</strong> · {repairDecision(repairs[0])}</span><small>{fmtDate(repairs[0].submitted_at)}</small>
+              {repairs[0].photo_latitude !== null && repairs[0].photo_longitude !== null ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${repairs[0].photo_latitude},${repairs[0].photo_longitude}`)}`} target="_blank" rel="noopener noreferrer"><MapPin size={14} />موقع الجهاز عند التصوير{repairs[0].photo_accuracy_m !== null ? ` · دقة ${number(Math.round(Number(repairs[0].photo_accuracy_m)))} م` : ''}</a> : <small>لم يتوفر موقع الجهاز عند التصوير.</small>}</figcaption></figure>
+        </div>
+        {repairs.length > 1 && <div className="dd-attempts"><span>محاولات سابقة</span>{repairs.slice(1).map((item) => <button type="button" key={item.id} onClick={() => { setExpandedImage(imageUrl(item.after_image_url)); setZoom(1); }} aria-label={`عرض صورة الإصلاح المرسلة في ${fmtDate(item.submitted_at)}`}><img src={imageUrl(item.after_image_url)} alt="" /><span>{repairDecision(item)}<small>{fmtDate(item.submitted_at)}</small></span></button>)}</div>}
+        <p className="dd-repair-hint">قارن الصورتين والموقع قبل تأكيد الحل؛ الصورة وحدها لا تثبت اكتمال العمل.</p>
+      </section>}
 
-      <div className="dd-media">
+      <div className={`dd-media ${repairs.length ? 'is-map-only' : ''}`}>
+        {!repairs.length && <>
         <button className="detail-image" onClick={() => { if (image) { setExpandedImage(image); setZoom(1); } }} disabled={!image} aria-label="عرض صورة البلاغ كاملة">
           {image ? <img src={image} alt={`صورة البلاغ ${id}`} /> : <span><ImageIcon size={32} />لا توجد صورة متاحة</span>}
           {image && <span className="image-expand"><Eye size={16} />عرض الصورة كاملة</span>}
-        </button>
+        </button></>}
         <div className="dd-place">
           <div className="detail-map" ref={mapContainer} />
           <p className="detail-location"><MapPin size={15} />{report.address_text || 'الموقع محدد بالإحداثيات'}</p>
