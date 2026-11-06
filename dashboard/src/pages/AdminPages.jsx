@@ -5,7 +5,7 @@ import {
   KeyRound, Menu, Pencil, RefreshCw, RotateCcw, Search, UserCog, UserPlus, Users,
 } from 'lucide-react';
 import { adminApi } from '../api.js';
-import { permissionNames, manageableRoles, accountsLabel, roleNames, auditActions, accountRoleName, fmtDate, number, errorText, EmptyState, LoadingState, PageHeading, agencyNames, localPhone, ModalShell, Pagination } from '../shared.jsx';
+import { permissionNames, manageableRoles, accountsLabel, roleNames, auditActions, accountRoleName, fmtDate, number, errorText, EmptyState, LoadingState, agencyNames, localPhone, ModalShell } from '../shared.jsx';
 
 function TemporaryPasswordModal({ title, username, password, onClose }) {
   const [copied, setCopied] = useState(false);
@@ -37,13 +37,6 @@ function usePagedList(load, filters, tick) {
   return state;
 }
 
-function AccountStatus({ account }) {
-  return <span className="account-status">
-    <span className={`status-pill ${account.is_active ? 'resolved' : 'rejected'}`}><i />{account.is_active ? 'نشط' : 'معطّل'}</span>
-    {account.is_active && account.must_change_password && <small className="account-flag">بانتظار تغيير كلمة المرور</small>}
-    {!account.is_active && account.deactivated_reason && <small className="account-reason">{account.deactivated_reason}</small>}
-  </span>;
-}
 
 const ROLE_PLURAL = { admin: 'المسؤولون', staff: 'الموظفون', field_worker: 'العمال الميدانيون' };
 const clockTime = new Intl.DateTimeFormat('ar-LY', { hour: 'numeric', minute: '2-digit' });
@@ -342,27 +335,87 @@ function auditDetail(item) {
   return parts.join(' · ') || '—';
 }
 
+const tripoliDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Tripoli' });
+const weekday = new Intl.DateTimeFormat('ar-LY', { weekday: 'long' });
+
+// Day headings for the log: اليوم، أمس، then the weekday and date.
+function auditDay(value) {
+  const date = new Date(value);
+  const day = tripoliDay.format(date);
+  if (day === tripoliDay.format(new Date())) return { key: day, label: 'اليوم' };
+  if (day === tripoliDay.format(new Date(Date.now() - 24 * 3600e3))) return { key: day, label: 'أمس' };
+  return { key: day, label: `${weekday.format(date)} · ${dayOnly.format(date)}` };
+}
+
+function auditTarget(item) {
+  if (!item.target_id) return { name: '—', sub: '' };
+  const name = item.target_name || item.target_username || localPhone(item.target_phone);
+  const sub = item.target_role === 'citizen' ? localPhone(item.target_phone) : roleNames[item.target_role] || '';
+  return { name, sub: sub === name ? '' : sub, ltr: item.target_role === 'citizen' };
+}
+
 export function AuditPage({ onMenu }) {
   const [filters, setFilters] = useState({ action: '', page: 1 });
   const [tick, setTick] = useState(0);
   const { result, loading, error } = usePagedList(adminApi.audit, filters, tick);
-  return <>
-    <PageHeading eyebrow="المساءلة" title="سجل الإجراءات" subtitle="كل إجراء إداري على الحسابات، ومن نفّذه ومتى." action="تحديث السجل" onAction={() => setTick((n) => n + 1)} onMenu={onMenu} />
-    <section className="panel reports-panel">
-      <div className="panel-heading"><div><span className="eyebrow">سجل لا يُعدّل</span><h2>الإجراءات الإدارية</h2></div><span className="count-chip">{number(result?.total || 0)} إجراء</span></div>
-      <div className="filters"><label>نوع الإجراء<select value={filters.action} onChange={(e) => setFilters({ action: e.target.value, page: 1 })}><option value="">كل الإجراءات</option>{Object.entries(auditActions).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div>
-      {loading && !result ? <LoadingState /> : error ? <EmptyState icon={CircleAlert} title="تعذّر تحميل السجل" detail={error} onRetry={() => setTick((n) => n + 1)} />
-        : !result?.items.length ? <EmptyState icon={History} title="لا توجد إجراءات" detail="ستظهر هنا إجراءات المسؤولين على الحسابات." />
-          : <><div className="table-scroll"><table className="report-table admin-table"><thead><tr><th>الوقت</th><th>المنفّذ</th><th>الإجراء</th><th>الحساب</th><th>التفاصيل</th></tr></thead>
-            <tbody>{result.items.map((item) => <tr key={item.id}>
-              <td className="date-cell">{fmtDate(item.created_at)}</td>
-              <td>{item.actor_name || item.actor_username}</td>
-              <td><strong>{auditActions[item.action] || item.action}</strong></td>
-              <td><span className="account-identity"><strong>{item.target_name || item.target_username || localPhone(item.target_phone)}</strong><small>{roleNames[item.target_role] || ''}</small></span></td>
-              <td className="audit-detail">{auditDetail(item)}</td>
-            </tr>)}</tbody></table></div>
-            <Pagination result={result} page={filters.page} setPage={(page) => setFilters((current) => ({ ...current, page }))} /></>}
+  const [actionCount, setActionCount] = useState({});
+  const [loadedAt, setLoadedAt] = useState(null);
+  useEffect(() => {
+    let active = true;
+    Promise.all(['', ...Object.keys(auditActions)].map((action) => adminApi.audit({ action, limit: 1 }).then((data) => [action, data.total])))
+      .then((pairs) => { if (active) setActionCount(Object.fromEntries(pairs)); })
+      .catch(() => { if (active) setActionCount({}); });
+    return () => { active = false; };
+  }, [tick]);
+  useEffect(() => { if (result) setLoadedAt(new Date()); }, [result]);
+  const groups = [];
+  for (const item of result?.items || []) {
+    const day = auditDay(item.created_at);
+    if (groups[groups.length - 1]?.key !== day.key) groups.push({ ...day, items: [] });
+    groups[groups.length - 1].items.push(item);
+  }
+  return <div className="rl ac">
+    <header className="pr-head">
+      <div className="pr-title">
+        <button className="icon-button mobile-menu" aria-label="فتح القائمة" onClick={onMenu}><Menu size={22} /></button>
+        <div><span className="eyebrow">المساءلة</span>
+          <h1>سجل الإجراءات{actionCount[''] !== undefined && <span className="pr-count num">{number(actionCount[''])}</span>}</h1>
+          <p>كل إجراء إداري على الحسابات، ومن نفّذه ومتى. السجل لا يُعدّل ولا يُحذف.</p></div>
+      </div>
+      <button type="button" className="pr-refresh" onClick={() => setTick((n) => n + 1)}>
+        <RefreshCw size={16} />{loadedAt ? <>تحديث · <span className="num">{clockTime.format(loadedAt)}</span></> : 'تحديث'}
+      </button>
+    </header>
+
+    <section className="rl-filters" aria-label="تصفية السجل">
+      <div className="rl-stages" role="group" aria-label="نوع الإجراء">
+        {[['', 'كل الإجراءات'], ...Object.entries(auditActions)].map(([key, label]) => <button type="button" key={key || 'all'} className={filters.action === key ? 'is-active' : ''} aria-pressed={filters.action === key} onClick={() => setFilters({ action: key, page: 1 })}>
+          {label}{actionCount[key] !== undefined && <small className="num">{number(actionCount[key])}</small>}
+        </button>)}
+      </div>
     </section>
-  </>;
+
+    {loading && !result ? <LoadingState /> : error ? <EmptyState icon={CircleAlert} title="تعذّر تحميل السجل" detail={error} onRetry={() => setTick((n) => n + 1)} />
+      : !result?.items.length ? <div className="rl-card rl-empty"><EmptyState icon={History} title="لا توجد إجراءات" detail={filters.action ? 'لا توجد إجراءات من هذا النوع بعد.' : 'ستظهر هنا إجراءات المسؤولين على الحسابات.'} /></div>
+        : <section className="rl-card"><div className="rl-scroll"><table className="ac-table is-audit">
+          <thead><tr><th scope="col">الوقت</th><th scope="col">الإجراء</th><th scope="col">الحساب</th><th scope="col">بواسطة</th><th scope="col">التفاصيل</th></tr></thead>
+          {groups.map((group) => <tbody key={group.key}>
+            <tr className="au-day"><th scope="rowgroup" colSpan={5}>{group.label}<small className="num">{number(group.items.length)}</small></th></tr>
+            {group.items.map((item) => {
+              const target = auditTarget(item);
+              const detail = auditDetail(item);
+              return <tr key={item.id}>
+                <td data-cell="time" className="ac-date"><time dateTime={item.created_at} title={fmtDate(item.created_at)}>{clockTime.format(new Date(item.created_at))}</time></td>
+                <td data-cell="action" className="au-action">{auditActions[item.action] || item.action}</td>
+                <td data-cell="target"><div className="ac-who"><span><strong>{target.name}</strong>{target.sub && <small className="au-sub" dir={target.ltr ? 'ltr' : undefined}>{target.sub}</small>}</span></div></td>
+                <td data-cell="actor" className="au-actor"><span className="ac-label">بواسطة: </span>{item.actor_name || item.actor_username}</td>
+                <td data-cell="details" className={`au-detail ${detail === '—' ? 'is-empty' : ''}`}>{detail}</td>
+              </tr>;
+            })}
+          </tbody>)}
+        </table></div>
+        {result.total_pages > 1 && <footer className="pr-pages"><span>صفحة <span className="num">{number(result.page)}</span> من <span className="num">{number(result.total_pages)}</span> · <span className="num">{number(result.total)}</span> إجراء</span><div><button className="icon-button" aria-label="الصفحة السابقة" disabled={filters.page <= 1} onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}><ChevronRight size={18} /></button><button className="icon-button" aria-label="الصفحة التالية" disabled={filters.page >= result.total_pages} onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}><ChevronLeft size={18} /></button></div></footer>}
+        </section>}
+  </div>;
 }
 

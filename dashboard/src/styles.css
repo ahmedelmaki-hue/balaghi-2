@@ -824,3 +824,24 @@ button.ov-stat:hover{box-shadow:0 6px 18px rgba(18,50,63,.09);transform:translat
   .ac-table td[data-cell="reports"]{grid-area:reports;font-size:13px;font-weight:700}
   .ac-table td[data-cell="joined"]{grid-area:joined;font-size:12px;text-align:left}
 }
+
+/* Audit log — the accounts table, one section per Tripoli day. */
+.ac-table.is-audit tbody+tbody .au-day th{border-top:1px solid var(--pr-line)}
+.au-day th{padding:10px 16px;background:#fcfaf6;border-bottom:1px solid var(--pr-rule);text-align:right;font-size:13px;font-weight:800;color:var(--pr-muted)}
+.au-day small{display:inline-grid;place-items:center;min-width:22px;height:20px;margin-inline-start:8px;padding:0 6px;border-radius:999px;background:#f1ede5;color:var(--pr-ink);font-size:11px;font-weight:800}
+.ac-table tbody tr.au-day:hover>th{background:#fcfaf6}
+.au-action{font-size:14px;font-weight:800;color:#111;white-space:nowrap}
+.au-sub{font-family:inherit!important}
+.au-actor{font-size:14px;white-space:nowrap}
+.au-detail{max-width:380px;font-size:13px;color:var(--pr-muted);line-height:1.7}
+@media(max-width:900px){
+  .ac-table.is-audit tbody tr.au-day{display:block;padding:0}
+  .ac-table.is-audit tbody tr.au-day th{display:block;padding:10px 14px}
+  .ac-table.is-audit tbody tr:not(.au-day){grid-template-areas:"action time" "target target" "actor actor" "details details";gap:6px 12px}
+  .ac-table td[data-cell="time"]{grid-area:time;text-align:left}
+  .ac-table td[data-cell="action"]{grid-area:action}
+  .ac-table td[data-cell="target"]{grid-area:target}
+  .ac-table td[data-cell="actor"]{grid-area:actor;font-size:13px;color:var(--pr-muted)}
+  .ac-table td[data-cell="details"]{grid-area:details;max-width:none}
+  .ac-table td[data-cell="details"].is-empty{display:none}
+}
