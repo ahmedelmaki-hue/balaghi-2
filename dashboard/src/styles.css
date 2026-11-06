@@ -923,3 +923,53 @@ button.ov-stat:hover{box-shadow:0 6px 18px rgba(18,50,63,.09);transform:translat
   .dd-place .detail-map{min-height:180px}
   .dd-facts{grid-template-columns:1fr 1fr;gap:10px 14px}
 }
+
+/* Dialogs — one look for every confirmation and form window (after 21st's alert
+   dialog with a media icon): icon beside the title, readable text and fields, and
+   a footer with the buttons. On phones they rise from the bottom as a sheet. */
+.modal-backdrop{background:rgba(10,31,42,.55);backdrop-filter:blur(3px)}
+.confirm-modal{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:14px;align-content:start;width:min(500px,100%);max-height:calc(100dvh - 40px);overflow-y:auto;padding:0;border-radius:18px;background:#fff;text-align:right;box-shadow:0 24px 60px rgba(10,31,42,.28);animation:dg-in .16s ease-out}
+.confirm-modal.admin-modal{width:min(540px,100%)}
+.confirm-modal.confirm-modal>*{grid-column:1/-1;margin-inline:24px}
+.confirm-modal.confirm-modal>p{margin:16px 24px 0}
+.confirm-modal.confirm-modal>.modal-icon{grid-column:1;grid-row:1/span 2;align-self:start;width:44px;height:44px;margin:24px 24px 0 0;border-radius:12px}
+.confirm-modal>.modal-icon svg{width:22px;height:22px}
+.confirm-modal.confirm-modal>h3{grid-column:2;grid-row:1;margin:24px 0 0 24px;font-size:19px;font-weight:800;line-height:1.45;color:#12323f}
+.confirm-modal.confirm-modal>h3+p{grid-column:2;grid-row:2;margin:4px 0 0 24px}
+.confirm-modal p{font-size:14px;line-height:1.75;color:#4d5b60}
+.confirm-modal.confirm-modal>:not(.modal-icon):not(h3):not(h3+p):not(.modal-actions){margin-top:16px;margin-bottom:0}
+
+.reason-label{font-size:13px;font-weight:800;color:#12323f}
+.reason-label span{display:inline-block;margin-inline-start:6px;padding:1px 8px;border-radius:999px;background:#fbe9e7;color:#a5281f;font-size:11px;font-weight:800;vertical-align:1px}
+.reason-label textarea{min-height:112px;margin-top:8px;padding:12px;border:1px solid #d8d1c3;border-radius:12px;font:inherit;font-size:14px;line-height:1.7;color:#12323f}
+.reason-label textarea:focus,.admin-form input:focus,.admin-form select:focus,.assignment-picker select:focus{border-color:#e5a93c;box-shadow:0 0 0 3px rgba(229,169,60,.2);outline:none}
+.reason-label small{margin-top:4px;font-size:12px;font-weight:600;color:#8a969a}
+
+.admin-form{gap:14px;margin-bottom:0}
+.admin-form label{gap:6px;font-size:13px;font-weight:800;color:#12323f}
+.admin-form input,.admin-form select{height:46px;padding:0 12px;border:1px solid #d8d1c3;border-radius:10px;font-size:14px}
+.admin-form small{font-size:12px;font-weight:600;color:#5b6a6f}
+.permission-picker{font-size:14px}
+.temp-password span{font-size:12px}
+.nearby-reasons small{font-size:12px}
+.nearby-reasons button{font-size:12px;padding:6px 12px}
+
+.confirm-modal>.form-error{font-size:13px}
+.confirm-modal.confirm-modal>.modal-actions{position:sticky;bottom:0;display:flex;gap:10px;margin:22px 0 0;padding:16px 24px 20px;border-top:1px solid #f0ebe1;background:#fcfaf6}
+.modal-actions .button{min-height:46px;padding:0 18px;font-size:15px;font-weight:800}
+.modal-actions .button:first-child{flex:1}
+@keyframes dg-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes dg-up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+
+@media(max-width:620px){
+  .modal-layer{place-items:end center;padding:0}
+  .confirm-modal,.confirm-modal.admin-modal{width:100%;max-height:92dvh;border-radius:20px 20px 0 0;animation-name:dg-up}
+  .confirm-modal.confirm-modal>*{margin-inline:18px}
+  .confirm-modal.confirm-modal>p{margin-inline:18px}
+  .confirm-modal.confirm-modal>.modal-icon{margin:20px 18px 0 0}
+  .confirm-modal.confirm-modal>h3{margin:20px 0 0 18px;font-size:18px}
+  .confirm-modal.confirm-modal>h3+p{margin:4px 0 0 18px}
+  .confirm-modal.confirm-modal>.modal-actions{flex-direction:column;margin-inline:0;padding:14px 18px calc(16px + env(safe-area-inset-bottom))}
+  .modal-actions .button{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.confirm-modal{animation:none}}
