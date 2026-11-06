@@ -50,7 +50,9 @@ function AccountRow({ item, user, onAction }) {
   const name = item.full_name || item.staff_username;
   return <tr className={item.is_active ? '' : 'is-off'}>
     <td data-cell="account"><div className="ac-who">
-      <span><strong>{item.full_name || '—'}{self && <b className="ac-self">أنت</b>}</strong><small dir="ltr">{item.staff_username}</small></span>
+      <span><strong>{item.full_name || '—'}{self && <b className="ac-self">أنت</b>}</strong><small className="ac-handle"><span dir="ltr">{item.staff_username}</span><i aria-hidden="true">·</i>{item.contact_phone
+        ? <a dir="ltr" href={`tel:${item.contact_phone}`} aria-label={`اتصل بـ ${name}`}>{localPhone(item.contact_phone)}</a>
+        : <b className="ac-nophone">بلا رقم</b>}</small></span>
     </div></td>
     <td data-cell="role"><div className="ac-tags">
       <span className="ac-role">{accountRoleName(item)}</span>
@@ -72,6 +74,12 @@ function AccountRow({ item, user, onAction }) {
   </tr>;
 }
 
+// A Libyan mobile number in any common form, or null; the server checks it too.
+function libyanMobile(value) {
+  const national = value.replace(/[\s()-]/g, '').replace(/^(\+?218|0)/, '');
+  return /^9\d{8}$/.test(national) ? `+218${national}` : null;
+}
+
 export function AccountsPage({ user, onMenu, onToast }) {
   const empty = { role: '', status: '', search: '', page: 1 };
   const [filters, setFilters] = useState(empty);
@@ -79,7 +87,7 @@ export function AccountsPage({ user, onMenu, onToast }) {
   const [tick, setTick] = useState(0);
   const [modal, setModal] = useState(null);
   const roles = manageableRoles(user);
-  const blankForm = { full_name: '', username: '', role: roles[0], agency: '', admin_permissions: [] };
+  const blankForm = { full_name: '', username: '', contact_phone: '', role: roles[0], agency: '', admin_permissions: [] };
   const [form, setForm] = useState(blankForm);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -100,7 +108,7 @@ export function AccountsPage({ user, onMenu, onToast }) {
   const open = (type, account = null) => {
     setModal({ type, account }); setFormError(''); setReason('');
     setForm(account ? { full_name: account.full_name || '', username: account.staff_username,
-      role: account.role, agency: account.agency || '',
+      contact_phone: account.contact_phone ? localPhone(account.contact_phone) : '', role: account.role, agency: account.agency || '',
       admin_permissions: account.admin_permissions || [] } : blankForm);
   };
   const close = () => { if (!busy) setModal(null); };
@@ -117,6 +125,7 @@ export function AccountsPage({ user, onMenu, onToast }) {
     const { type, account } = modal;
     if (['create', 'edit'].includes(type)) {
       if (!form.full_name.trim()) { setFormError('اكتب الاسم الكامل.'); return; }
+      if (!libyanMobile(form.contact_phone)) { setFormError('اكتب رقم جوال ليبي صحيحًا للتواصل، مثل 0912345678.'); return; }
       if (form.role === 'field_worker' && !form.agency) { setFormError('اختر جهة العمل للعامل الميداني.'); return; }
     }
     setBusy(true); setFormError('');
@@ -124,12 +133,12 @@ export function AccountsPage({ user, onMenu, onToast }) {
       const agency = form.role === 'field_worker' ? form.agency : null;
       if (type === 'create') {
         const created = await adminApi.createUser({ full_name: form.full_name.trim(),
-          username: form.username.trim().toLowerCase(), role: form.role, agency,
+          username: form.username.trim().toLowerCase(), contact_phone: libyanMobile(form.contact_phone), role: form.role, agency,
           ...(form.role === 'admin' ? { admin_permissions: form.admin_permissions } : {}) });
         setModal({ type: 'password', title: 'تم إنشاء الحساب', username: created.user.staff_username,
           password: created.temporary_password });
       } else if (type === 'edit') {
-        const body = { full_name: form.full_name.trim() };
+        const body = { full_name: form.full_name.trim(), contact_phone: libyanMobile(form.contact_phone) };
         if (account.id !== user.id && !account.is_owner) {
           Object.assign(body, { role: form.role, agency });
           if (form.role === 'admin') body.admin_permissions = form.admin_permissions;
@@ -199,6 +208,7 @@ export function AccountsPage({ user, onMenu, onToast }) {
       <p>{modal.type === 'create' ? 'سيحصل صاحب الحساب على كلمة مرور مؤقتة يغيّرها عند أول دخول.' : `اسم المستخدم: ${account.staff_username}`}</p>
       <div className="admin-form">
         <label>الاسم الكامل<input value={form.full_name} maxLength={100} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></label>
+        <label><span>رقم للتواصل <span className="ac-required">إلزامي</span></span><input dir="ltr" type="tel" inputMode="tel" autoComplete="off" required value={form.contact_phone} maxLength={16} placeholder="0912345678" onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} /><small>{modal.type === 'edit' && !account.contact_phone ? 'هذا الحساب بلا رقم بعد؛ أضفه لحفظ أي تعديل. ' : ''}للتواصل فقط، ولا يُستخدم لتسجيل الدخول.</small></label>
         {modal.type === 'create' && <label>اسم المستخدم<input dir="ltr" value={form.username} maxLength={50} placeholder="مثل: water.ali" onChange={(e) => setForm({ ...form, username: e.target.value })} /><small>أحرف إنجليزية صغيرة وأرقام و _ . - ويبدأ بحرف.</small></label>}
         <label>الدور<select value={form.role} disabled={account?.id === user.id || account?.is_owner} onChange={(e) => setForm({ ...form, role: e.target.value })}>{(account && !roles.includes(account.role) ? [account.role, ...roles] : roles).map((role) => <option key={role} value={role}>{role === 'admin' && account?.is_owner ? 'مسؤول رئيسي' : roleNames[role]}</option>)}</select>{account?.id === user.id && <small>لا يمكنك تغيير دورك بنفسك.</small>}</label>
         {form.role === 'admin' && !account?.is_owner && account?.id !== user.id && <fieldset className="permission-picker"><legend>صلاحيات المسؤول</legend>

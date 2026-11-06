@@ -125,9 +125,11 @@ test('owners manage accounts and permissions within the real constraints', async
     await w.addAccount('helper', { role: 'admin', permissions: ['manage_workers'], fullName: 'مسؤول العمال' });
 
     const created = await w.call('owner-token', '/admin/users', { method: 'POST', body: {
-      full_name: 'مسؤول السجل', username: `it_audit_${Date.now()}`, role: 'admin', admin_permissions: ['view_audit'] } });
+      full_name: 'مسؤول السجل', username: `it_audit_${Date.now()}`, role: 'admin', admin_permissions: ['view_audit'],
+      contact_phone: '0912345678' } });
     assert.equal(created.status, 201, JSON.stringify(created.body));
     assert.deepEqual(created.body.user.admin_permissions, ['view_audit']);
+    assert.equal(created.body.user.contact_phone, '+218912345678');
     assert.equal(created.body.user.must_change_password, true);
 
     const granted = await w.call('owner-token', `/admin/users/${created.body.user.id}`, {
@@ -135,7 +137,8 @@ test('owners manage accounts and permissions within the real constraints', async
     assert.equal(granted.status, 200, JSON.stringify(granted.body));
 
     const worker = await w.call('helper-token', '/admin/users', { method: 'POST', body: {
-      full_name: 'عامل جديد', username: `it_worker_${Date.now()}`, role: 'field_worker', agency: 'roads_maintenance' } });
+      full_name: 'عامل جديد', username: `it_worker_${Date.now()}`, role: 'field_worker', agency: 'roads_maintenance',
+      contact_phone: '+218923456789' } });
     assert.equal(worker.status, 201, JSON.stringify(worker.body));
     assert.equal((await w.call('helper-token', '/admin/citizens')).status, 403);
 

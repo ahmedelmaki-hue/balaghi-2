@@ -973,3 +973,14 @@ button.ov-stat:hover{box-shadow:0 6px 18px rgba(18,50,63,.09);transform:translat
   .modal-actions .button{width:100%}
 }
 @media(prefers-reduced-motion:reduce){.confirm-modal{animation:none}}
+
+/* Contact number for staff, workers and administrators. */
+.ac-who small.ac-handle{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:inherit}
+.ac-handle>span{font-family:ui-monospace,Consolas,monospace}
+.ac-handle i{font-style:normal;color:#b3bcbe}
+.ac-handle a{font-variant-numeric:tabular-nums;font-weight:700;color:#126477;text-decoration:none}
+.ac-handle a:hover{text-decoration:underline}
+.ac-nophone{padding:1px 8px;border-radius:999px;background:#fdf3df;color:#7a5408;font-size:11px;font-weight:800}
+.ac-required{display:inline-block;margin-inline-start:6px;padding:1px 8px;border-radius:999px;background:#fbe9e7;color:#a5281f;font-size:11px;font-weight:800}
+.dd-call{font-variant-numeric:tabular-nums;color:#126477;text-decoration:none}
+.dd-call:hover{text-decoration:underline}

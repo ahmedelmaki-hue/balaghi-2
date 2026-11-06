@@ -219,6 +219,7 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast, onOpen }) {
         {report.approved_at && report.status !== 'rejected' && <>
           <div><dt>جهة العمل</dt><dd>{report.assigned_agency ? agencies[report.assigned_agency] || report.assigned_agency : 'لم تُحدّد'}</dd></div>
           <div><dt>الاستلام</dt><dd>{report.assigned_worker_id ? `${report.assigned_worker_name || report.assigned_worker_username || 'عامل'} · ${report.work_started_at ? 'بدأ العمل' : 'استلمه'}` : 'بانتظار الاستلام'}</dd></div>
+          {report.assigned_worker_id && report.assigned_worker_contact_phone && <div><dt>رقم العامل</dt><dd><a className="dd-call" dir="ltr" href={`tel:${report.assigned_worker_contact_phone}`} aria-label={`اتصل بـ ${report.assigned_worker_name || 'العامل'}`}>{localPhone(report.assigned_worker_contact_phone)}</a></dd></div>}
           {report.assigned_at && <div><dt>تاريخ الإسناد</dt><dd>{fmtDate(report.assigned_at)}</dd></div>}
         </>}
       </dl></section>

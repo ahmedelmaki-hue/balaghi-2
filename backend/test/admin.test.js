@@ -147,28 +147,47 @@ test('a suspended citizen cannot request a sign-in code', async () => {
 test('admin creates an account with a one-time temporary password', async () => {
   const authAdmin = fakeAuthAdmin();
   const audits = [];
+  const inserts = [];
   let failInsert = false;
   const pool = fakePool((sql, params) => {
     if (sql.includes('SELECT 1 FROM public.profiles WHERE staff_username')) return { rows: [] };
     if (sql.includes('INSERT INTO public.profiles')) {
       if (failInsert) throw new Error('database unavailable');
+      inserts.push(params);
       return { rows: [{ id: params[0], full_name: params[1], staff_username: params[2],
-        role: params[4], agency: params[5], must_change_password: true }] };
+        role: params[4], agency: params[5], contact_phone: params[7], must_change_password: true }] };
     }
     if (sql.includes('INSERT INTO public.admin_audit_log')) { audits.push(params); return { rows: [] }; }
     throw new Error(`Unexpected SQL: ${sql}`);
   });
   await withServer({ pool, authClientFactory: authClientFactory(), authAdmin,
     staffEmailDomain: 'staff.example' }, async (base) => {
-    const create = (body) => request(base, '/api/admin/users', 'admin-token', { method: 'POST', body });
+    const create = (body) => request(base, '/api/admin/users', 'admin-token',
+      { method: 'POST', body: { contact_phone: '0912345678', ...body } });
     assert.equal((await create({ full_name: 'عامل', username: 'water1', role: 'field_worker' })).status, 400);
     assert.equal((await create({ full_name: 'موظف', username: 'desk1', role: 'staff',
       agency: 'water_sewer' })).status, 400);
     assert.equal((await create({ full_name: 'موظف', username: '1bad', role: 'staff' })).status, 400);
+    // Every new account needs a Libyan mobile number to be reached on.
+    for (const contact of [undefined, '', '0812345678', '091234567', '+2189123456789', 912345678]) {
+      const refused = await create({ full_name: 'موظف', username: 'desk1', role: 'staff',
+        contact_phone: contact });
+      assert.deepEqual(refused, { status: 400,
+        body: { error: 'contact_phone must be a Libyan mobile number' } }, String(contact));
+    }
+    assert.equal(inserts.length, 0);
 
     const created = await create({ full_name: 'عامل المياه', username: 'Water1',
-      role: 'field_worker', agency: 'water_sewer' });
+      role: 'field_worker', agency: 'water_sewer', contact_phone: '091 234-5678' });
     assert.equal(created.status, 201);
+    assert.equal(created.body.user.contact_phone, '+218912345678');
+    assert.equal(inserts[0][7], '+218912345678');
+    for (const [form, stored] of [['+218923456789', '+218923456789'], ['218923456789', '+218923456789'],
+      ['923456789', '+218923456789']]) {
+      const again = await create({ full_name: 'موظف', username: `desk${inserts.length}`,
+        role: 'staff', contact_phone: form });
+      assert.equal(again.body.user.contact_phone, stored, form);
+    }
     assert.equal(created.body.user.staff_username, 'water1');
     assert.equal(created.body.user.must_change_password, true);
     assert.match(created.body.temporary_password, /^[A-Za-z0-9_-]{16}$/);
@@ -179,6 +198,7 @@ test('admin creates an account with a one-time temporary password', async () => 
     assert.equal(audits[0][0], adminId);
     assert.equal(audits[0][1], 'account_created');
     assert.doesNotMatch(audits[0][3], /password/);
+    assert.equal(JSON.parse(audits[0][3]).contact_phone, '+218912345678');
 
     failInsert = true;
     assert.equal((await create({ full_name: 'موظف', username: 'desk2', role: 'staff' })).status, 500);
@@ -296,6 +316,46 @@ test('reset forces a new password; the owner changes it without the admin knowin
   });
 });
 
+test('an account without a contact number must gain one when it is next edited', async () => {
+  const stored = { id: staffId, full_name: 'موظف', role: 'staff', agency: null, is_owner: false,
+    admin_permissions: [], is_active: true, contact_phone: null };
+  const audits = [];
+  const updates = [];
+  const pool = fakePool((sql, params) => {
+    if (sql.includes('FOR UPDATE')) return { rows: [stored] };
+    if (sql.includes('UPDATE public.profiles AS p SET full_name')) {
+      updates.push(params);
+      return { rows: [{ ...stored, full_name: params[1], contact_phone: params[5] }] };
+    }
+    if (sql.includes('INSERT INTO public.admin_audit_log')) { audits.push(params); return { rows: [] }; }
+    throw new Error(`Unexpected SQL: ${sql}`);
+  });
+  await withServer({ pool, authClientFactory: authClientFactory(), authAdmin: fakeAuthAdmin() },
+    async (base) => {
+      const patch = (body) => request(base, `/api/admin/users/${staffId}`, 'admin-token',
+        { method: 'PATCH', body });
+      const missing = { status: 400, body: { error: 'contact_phone must be a Libyan mobile number' } };
+      assert.deepEqual(await patch({ full_name: 'موظف المكتب' }), missing);
+      assert.deepEqual(await patch({ full_name: 'موظف المكتب', contact_phone: '' }), missing);
+      assert.deepEqual(await patch({ contact_phone: null }), missing);
+      assert.equal(updates.length, 0);
+
+      const saved = await patch({ full_name: 'موظف المكتب', contact_phone: '0945556677' });
+      assert.equal(saved.status, 200);
+      assert.equal(saved.body.user.contact_phone, '+218945556677');
+      assert.deepEqual(JSON.parse(audits.at(-1)[3]).changes.contact_phone,
+        { from: null, to: '+218945556677' });
+
+      // Once saved, the number stays when other fields change and cannot be cleared.
+      stored.contact_phone = '+218945556677';
+      const renamed = await patch({ full_name: 'موظفة المكتب' });
+      assert.equal(renamed.status, 200);
+      assert.equal(updates.at(-1)[5], '+218945556677');
+      assert.equal(JSON.parse(audits.at(-1)[3]).changes.contact_phone, undefined);
+      assert.deepEqual(await patch({ contact_phone: '' }), missing);
+    });
+});
+
 test('a limited administrator manages only the accounts it was granted', async () => {
   const listed = [];
   const pool = fakePool((sql, params) => {
@@ -316,7 +376,7 @@ test('a limited administrator manages only the accounts it was granted', async (
     async (base) => {
       const get = (path) => request(base, path, 'helper-token');
       const create = (body) => request(base, '/api/admin/users', 'helper-token',
-        { method: 'POST', body });
+        { method: 'POST', body: { contact_phone: '0912345678', ...body } });
       assert.equal((await get('/api/admin/users')).status, 200);
       assert.deepEqual(listed.at(-1), ['field_worker']);
       assert.equal((await get('/api/admin/users?role=staff')).status, 403);
@@ -335,11 +395,11 @@ test('only owners manage administrators, and owners are protected from the dashb
   const regularId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   const targets = {
     [ownerTwoId]: { id: ownerTwoId, full_name: 'رئيسي ثانٍ', role: 'admin', agency: null,
-      is_owner: true, admin_permissions: [], is_active: true },
+      is_owner: true, admin_permissions: [], is_active: true, contact_phone: '+218911111111' },
     [regularId]: { id: regularId, full_name: 'مسؤول السجل', role: 'admin', agency: null,
-      is_owner: false, admin_permissions: ['view_audit'], is_active: true },
+      is_owner: false, admin_permissions: ['view_audit'], is_active: true, contact_phone: '+218922222222' },
     [helperId]: { id: helperId, full_name: 'مسؤول العمال', role: 'admin', agency: null,
-      is_owner: false, admin_permissions: ['manage_workers'], is_active: true },
+      is_owner: false, admin_permissions: ['manage_workers'], is_active: true, contact_phone: '+218933333333' },
   };
   const inserts = [];
   const audits = [];
@@ -365,7 +425,7 @@ test('only owners manage administrators, and owners are protected from the dashb
       assert.equal((await owner('/api/admin/users', 'POST', { full_name: 'موظف', username: 'desk1',
         role: 'staff', admin_permissions: ['view_audit'] })).status, 400);
       const created = await owner('/api/admin/users', 'POST', { full_name: 'مسؤول', username: 'boss2',
-        role: 'admin', admin_permissions: ['view_audit', 'manage_staff'] });
+        role: 'admin', admin_permissions: ['view_audit', 'manage_staff'], contact_phone: '0912345678' });
       assert.equal(created.status, 201);
       assert.deepEqual(inserts.at(-1)[6], ['manage_staff', 'view_audit']);
 

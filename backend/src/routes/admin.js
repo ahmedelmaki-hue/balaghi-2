@@ -13,7 +13,7 @@ const AUDIT_ACTIONS = ['account_created', 'account_updated', 'account_deactivate
   'account_reactivated', 'password_reset', 'password_changed'];
 const ACCOUNT_COLUMNS = `p.id, p.full_name, p.staff_username, p.role, p.agency,
   p.is_active, p.deactivated_reason, p.deactivated_at, p.must_change_password,
-  p.password_changed_at, p.is_owner, p.admin_permissions, p.created_at`;
+  p.password_changed_at, p.is_owner, p.admin_permissions, p.contact_phone, p.created_at`;
 const OWNER_LOCKED = 'owner accounts are managed on the server';
 
 function profileId(value) {
@@ -28,6 +28,17 @@ function fullName(value) {
     throw new HttpError(400, 'full_name must be 1 to 100 characters');
   }
   return value.trim();
+}
+
+// A Libyan mobile number in any common form (0912345678, 912345678, 218..., +218...),
+// stored as +2189XXXXXXXX. It is for contacting the account holder, not for sign-in.
+function contactPhone(value) {
+  const digits = typeof value === 'string' ? value.replace(/[\s()-]/g, '') : '';
+  const national = digits.replace(/^(\+?218|0)/, '');
+  if (!/^9\d{8}$/.test(national)) {
+    throw new HttpError(400, 'contact_phone must be a Libyan mobile number');
+  }
+  return `+218${national}`;
 }
 
 function searchText(value) {
@@ -170,6 +181,7 @@ function createAdminRouter({ pool, auth, authAdmin, staffEmailDomain }) {
   router.post('/users', asyncRoute(async (req, res) => {
     const body = req.body || {};
     const name = fullName(body.full_name);
+    const phone = contactPhone(body.contact_phone);
     const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
     if (!USERNAME_RE.test(username)) {
       throw new HttpError(400, 'username must be 3 to 50 lowercase letters, digits, _ . or -');
@@ -200,13 +212,13 @@ function createAdminRouter({ pool, auth, authAdmin, staffEmailDomain }) {
         const { rows } = await db.query(
           `INSERT INTO public.profiles AS p
            (id, full_name, staff_username, staff_auth_email, role, agency,
-            admin_permissions, must_change_password)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+            admin_permissions, contact_phone, must_change_password)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
            RETURNING ${ACCOUNT_COLUMNS}`,
-          [id, name, username, email, body.role, agency, permissions || []]
+          [id, name, username, email, body.role, agency, permissions || [], phone]
         );
         await audit(db, req.user.id, 'account_created', id, {
-          username, role: body.role, agency,
+          username, role: body.role, agency, contact_phone: phone,
           ...(body.role === 'admin' ? { admin_permissions: permissions || [] } : {}),
         });
         return rows[0];
@@ -244,8 +256,17 @@ function createAdminRouter({ pool, auth, authAdmin, staffEmailDomain }) {
       const agency = agencyFor(role,
         body.agency === undefined && role === current.role ? current.agency : body.agency);
       const name = body.full_name === undefined ? current.full_name : fullName(body.full_name);
+      // Required on every edit, so accounts made before it existed gain one when next saved.
+      if (body.contact_phone === undefined && !current.contact_phone) {
+        throw new HttpError(400, 'contact_phone must be a Libyan mobile number');
+      }
+      const phone = body.contact_phone === undefined ? current.contact_phone
+        : contactPhone(body.contact_phone);
       const changes = {};
       if (name !== current.full_name) changes.full_name = { from: current.full_name, to: name };
+      if (phone !== current.contact_phone) {
+        changes.contact_phone = { from: current.contact_phone, to: phone };
+      }
       if (role !== current.role) changes.role = { from: current.role, to: role };
       if (agency !== current.agency) changes.agency = { from: current.agency, to: agency };
       const before = [...(current.admin_permissions || [])].sort();
@@ -264,9 +285,9 @@ function createAdminRouter({ pool, auth, authAdmin, staffEmailDomain }) {
       // The acting administrator stays an active admin, so at least one always remains.
       const { rows } = await db.query(
         `UPDATE public.profiles AS p SET full_name = $2, role = $3, agency = $4,
-           admin_permissions = $5
+           admin_permissions = $5, contact_phone = $6
          WHERE p.id = $1 RETURNING ${ACCOUNT_COLUMNS}`,
-        [id, name, role, agency, permissions]
+        [id, name, role, agency, permissions, phone]
       );
       await audit(db, req.user.id, 'account_updated', id,
         released ? { changes, ...released } : { changes });

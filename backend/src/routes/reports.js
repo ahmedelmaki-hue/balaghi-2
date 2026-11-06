@@ -393,6 +393,7 @@ function createReportsRouter({ pool, auth, storage, geocoder = null }) {
          worker.full_name AS assigned_worker_name,
          worker.staff_username AS assigned_worker_username,
          worker.is_active AS assigned_worker_active,
+         worker.contact_phone AS assigned_worker_contact_phone,
          approver.full_name AS approved_by_name,
          approver.staff_username AS approved_by_username, ${REJECTION_REASON}
        FROM public.reports r JOIN public.profiles p ON p.id = r.user_id

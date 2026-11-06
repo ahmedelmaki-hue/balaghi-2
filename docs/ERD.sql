@@ -22,7 +22,13 @@ CREATE TABLE public.profiles (
   password_changed_at TIMESTAMPTZ,
   is_owner BOOLEAN NOT NULL DEFAULT FALSE,
   admin_permissions TEXT[] NOT NULL DEFAULT '{}',
+  -- رقم للتواصل مع الموظف أو العامل أو المسؤول، منفصل عن phone الذي يدخل به المواطن.
+  -- يفرضه الخادم عند الإنشاء والتعديل، ويبقى فارغًا للحسابات القديمة حتى يُضاف.
+  contact_phone VARCHAR(20),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT profiles_contact_phone_check CHECK (
+    contact_phone IS NULL OR (role <> 'citizen' AND contact_phone ~ '^\+2189[0-9]{8}$')
+  ),
   CONSTRAINT profiles_agency_check CHECK (
     agency IS NULL OR agency IN ('public_services', 'water_sewer', 'roads_maintenance')
   ),

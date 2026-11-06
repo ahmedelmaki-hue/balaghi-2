@@ -84,6 +84,7 @@ export const auditActions = {
 };
 const adminMessages = {
   'username already exists': 'اسم المستخدم مستخدم بالفعل. اختر اسمًا آخر.',
+  'contact_phone must be a Libyan mobile number': 'اكتب رقم جوال ليبي صحيحًا للتواصل، مثل 0912345678.',
   'cannot change own role': 'لا يمكنك تغيير دورك بنفسك.',
   'cannot change own account status': 'لا يمكنك تعطيل حسابك بنفسك.',
   'use password change for your own account': 'غيّر كلمة مرورك من «تغيير كلمة المرور».',
