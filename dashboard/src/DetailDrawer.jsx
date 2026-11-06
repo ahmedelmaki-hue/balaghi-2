@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { imageUrl, staffApi } from './api.js';
 import { buildReportTimeline } from './reportTimeline.js';
-import { categories, agencies, agencyTeams, categoryAgency, fieldIssueReasons, verificationResults, fmtDate, number, categoryName, errorText, CategoryIcon, StatusPill, LoadingState } from './shared.jsx';
+import { categories, agencies, agencyTeams, categoryAgency, fieldIssueReasons, verificationResults, fmtDate, number, categoryName, errorText, localPhone, StatusPill, LoadingState } from './shared.jsx';
 
 function LocationCorrectionPicker({ latitude, longitude, onChange }) {
   const container = useRef(null);
@@ -160,38 +160,70 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast, onOpen }) {
   const image = imageUrl(report?.image_url);
   const nearbyItems = nearby?.items || [];
   const duplicateReason = (otherId) => `مكرر: سبق الإبلاغ عن المشكلة نفسها في البلاغ #${otherId}.`;
-  return <div className="drawer-layer"><button className="drawer-backdrop" aria-label="إغلاق التفاصيل" onClick={onClose} /><aside className="detail-drawer" role="dialog" aria-modal="true" aria-label={`تفاصيل البلاغ ${id}`}>
-    <div className="drawer-head"><div><span className="eyebrow">{pending ? 'فحص البلاغ' : 'تفاصيل البلاغ'}</span><h2>بلاغ #{id}</h2></div><div className="drawer-head-actions"><button className="icon-button" aria-label="تحديث تفاصيل البلاغ" title="تحديث التفاصيل" onClick={() => setTick((value) => value + 1)}><RefreshCw size={19} /></button><button className="icon-button" aria-label="إغلاق التفاصيل" onClick={onClose}><X size={20} /></button></div></div>
+  return <div className="drawer-layer"><button className="drawer-backdrop" aria-label="إغلاق التفاصيل" onClick={onClose} /><aside className="detail-drawer dd" role="dialog" aria-modal="true" aria-label={`تفاصيل البلاغ ${id}`}>
+    <div className="drawer-head dd-head"><div><span className="eyebrow">{pending ? 'فحص البلاغ' : 'تفاصيل البلاغ'}</span><h2>بلاغ #{id}{report && <span className="dd-head-cat">{categoryName(report.category)}</span>}</h2>{report && <small className="dd-head-date">أُرسل {fmtDate(report.created_at)}</small>}</div><div className="drawer-head-actions">{report && <StatusPill report={report} />}<button className="icon-button" aria-label="تحديث تفاصيل البلاغ" title="تحديث التفاصيل" onClick={() => setTick((value) => value + 1)}><RefreshCw size={19} /></button><button className="icon-button" aria-label="إغلاق التفاصيل" onClick={onClose}><X size={20} /></button></div></div>
     {error && <div className="inline-error" role="alert"><CircleAlert size={17} />{error}<button onClick={() => setTick((n) => n + 1)}>تحديث</button></div>}
-    {!report ? (error ? null : <LoadingState />) : <><div className="drawer-content">
+    {!report ? (error ? null : <LoadingState />) : <><div className="drawer-content dd-content">
       {report.assigned_worker_id && report.assigned_worker_active === false && ['new', 'in_progress'].includes(report.status) && <div className="inline-note" role="status">العامل الذي استلم هذا البلاغ ({report.assigned_worker_name || report.assigned_worker_username}) حسابه معطّل. أعد البلاغ إلى قائمة الجهة ليستلمه عامل آخر.</div>}
-      <button className="detail-image" onClick={() => { if (image) { setExpandedImage(image); setZoom(1); } }} disabled={!image} aria-label="عرض صورة البلاغ كاملة">
-        {image ? <img src={image} alt={`صورة البلاغ ${id}`} /> : <span><ImageIcon size={32} />لا توجد صورة متاحة</span>}
-        {image && <span className="image-expand"><Eye size={16} />عرض الصورة كاملة</span>}
-      </button>
-      <div className="detail-title"><div><CategoryIcon category={report.category} size={22} /><div><h3>{categoryName(report.category)}</h3><span>{fmtDate(report.created_at)}</span></div></div><StatusPill report={report} /></div>
-      <section className="detail-section"><h4>وصف المشكلة</h4><p>{report.description || 'لم يُضف وصف لهذا البلاغ.'}</p></section>
-      {pending && <section className="detail-section"><h4>تصنيف البلاغ قبل الاعتماد</h4><label className="assignment-picker">نوع المشكلة<select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} disabled={verificationOpen}>{Object.entries(categories).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select></label><p>جهة العمل عند الاعتماد: <strong>{agencies[categoryAgency[selectedCategory]]}</strong></p><button className="button button-quiet" disabled={busy || verificationOpen || selectedCategory === report.category} onClick={() => setModal('category')}>حفظ التصنيف</button>{selectedCategory !== report.category && <small>احفظ التصنيف قبل اعتماد البلاغ أو طلب التحقق.</small>}{verificationOpen && <small>أكمل طلب التحقق أو ألغِه قبل تغيير التصنيف.</small>}</section>}
-      <section className="detail-section"><h4>الموقع الجغرافي</h4><p className="detail-location"><MapPin size={16} />{report.address_text || 'الموقع محدد بالإحداثيات'}</p><div className="detail-map" ref={mapContainer} /><small className="coordinates">{Number(report.latitude).toFixed(6)}، {Number(report.longitude).toFixed(6)}</small><a className="button button-quiet location-google-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${Number(report.latitude)},${Number(report.longitude)}`)}`} target="_blank" rel="noopener noreferrer"><MapPinned size={16} />فتح الموقع في Google Maps</a></section>
+
+      {pending && <section className="dd-decide" aria-labelledby="dd-decide-title">
+        <h3 id="dd-decide-title">بانتظار مراجعتك</h3>
+        <p>تأكد من الصورة والموقع والتصنيف، ثم اعتمد البلاغ أو اطلب تحققًا ميدانيًا أو ارفضه.</p>
+        {nearbyItems.length > 0 && <a className="dd-decide-warn" href="#nearby-title"><CircleAlert size={15} />قد يكون مكررًا: <span className="num">{number(nearbyItems.length)}</span> بلاغ قريب من التصنيف نفسه</a>}
+        <div className="dd-category"><label className="assignment-picker">التصنيف<select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} disabled={verificationOpen}>{Object.entries(categories).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select></label><span>الجهة عند الاعتماد: <strong>{agencies[categoryAgency[selectedCategory]]}</strong></span>{selectedCategory !== report.category && <button className="button button-quiet" disabled={busy || verificationOpen} onClick={() => setModal('category')}>حفظ التصنيف</button>}</div>
+        {selectedCategory !== report.category && <small>احفظ التصنيف قبل اعتماد البلاغ أو طلب التحقق.</small>}
+        {verificationOpen && <small>أكمل طلب التحقق أو ألغِه قبل تغيير التصنيف.</small>}
+      </section>}
+      {pendingFieldIssue && <section className="dd-decide is-issue" aria-labelledby="dd-issue-title">
+        <h3 id="dd-issue-title">ملاحظة الفريق · تحتاج قرارك</h3>
+        <p><strong>{fieldIssueReasons[pendingFieldIssue.reason]}</strong> · {agencyTeams[report.assigned_agency] || 'فريق جهة العمل'}</p>
+        <p>{pendingFieldIssue.note}</p><small>{fmtDate(pendingFieldIssue.raised_at)}</small>
+      </section>}
+      {pendingCompletion && <section className="dd-decide is-done" aria-labelledby="dd-done-title">
+        <h3 id="dd-done-title">إنجاز العمل · بانتظار تأكيدك</h3>
+        <p>أبلغ {pendingCompletion.worker_name || pendingCompletion.worker_username || 'العامل الميداني'} بإتمام العمل.{pendingCompletion.note && <> وصف العمل: {pendingCompletion.note}</>}</p><small>وقت الإرسال: {fmtDate(pendingCompletion.submitted_at)}</small>
+      </section>}
+
+      {data.completions?.some((item) => item.after_image_url) ? <section className="detail-section completion-evidence"><h4>صور الإصلاح للمراجعة</h4><div className="completion-photo-compare"><div><strong>قبل الإصلاح · صورة البلاغ</strong><button type="button" onClick={() => { setExpandedImage(image); setZoom(1); }}><img src={image} alt="صورة المشكلة قبل الإصلاح" /></button></div>{data.completions.filter((item) => item.after_image_url).map((item) => <div key={item.id}><strong>بعد الإصلاح · {item.decision === 'confirmed' ? 'مؤكد' : item.decision === 'returned' ? 'أُعيد للعمل' : 'بانتظار القرار'}</strong><button type="button" onClick={() => { setExpandedImage(imageUrl(item.after_image_url)); setZoom(1); }}><img src={imageUrl(item.after_image_url)} alt={`صورة الإصلاح المرسلة في ${fmtDate(item.submitted_at)}`} /></button><small>أُرسلت: {fmtDate(item.submitted_at)}</small>{item.photo_latitude !== null && item.photo_longitude !== null ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${item.photo_latitude},${item.photo_longitude}`)}`} target="_blank" rel="noopener noreferrer"><MapPin size={14} />موقع الجهاز عند التصوير{item.photo_accuracy_m !== null ? ` · دقة تقريبية ${Math.round(Number(item.photo_accuracy_m))} م` : ''}</a> : <small>لم يتوفر موقع الجهاز عند التصوير.</small>}</div>)}</div><p className="completion-evidence-hint">قارن الصورتين والموقع قبل تأكيد الحل؛ الصورة وحدها لا تثبت اكتمال العمل.</p></section> : null}
+
+      <div className="dd-media">
+        <button className="detail-image" onClick={() => { if (image) { setExpandedImage(image); setZoom(1); } }} disabled={!image} aria-label="عرض صورة البلاغ كاملة">
+          {image ? <img src={image} alt={`صورة البلاغ ${id}`} /> : <span><ImageIcon size={32} />لا توجد صورة متاحة</span>}
+          {image && <span className="image-expand"><Eye size={16} />عرض الصورة كاملة</span>}
+        </button>
+        <div className="dd-place">
+          <div className="detail-map" ref={mapContainer} />
+          <p className="detail-location"><MapPin size={15} />{report.address_text || 'الموقع محدد بالإحداثيات'}</p>
+          <div className="dd-place-foot"><small className="coordinates" dir="ltr">{Number(report.latitude).toFixed(6)}, {Number(report.longitude).toFixed(6)}</small><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${Number(report.latitude)},${Number(report.longitude)}`)}`} target="_blank" rel="noopener noreferrer"><MapPinned size={15} />فتح في Google Maps</a></div>
+        </div>
+      </div>
+
+      <section className="dd-block"><h4>وصف المشكلة</h4><p className={report.description ? '' : 'is-empty'}>{report.description || 'لم يُضف المواطن وصفًا.'}</p></section>
+
+      <section className="dd-block"><h4>البيانات <span className="private-tag">للموظف فقط</span></h4><dl className="dd-facts">
+        <div><dt>مقدم البلاغ</dt><dd>{report.reporter_name || 'غير محدد'}</dd></div>
+        <div><dt>رقم الهاتف</dt><dd dir="ltr">{report.reporter_phone ? localPhone(report.reporter_phone) : '—'}</dd></div>
+        {report.approved_at && report.status !== 'rejected' && <>
+          <div><dt>جهة العمل</dt><dd>{report.assigned_agency ? agencies[report.assigned_agency] || report.assigned_agency : 'لم تُحدّد'}</dd></div>
+          <div><dt>الاستلام</dt><dd>{report.assigned_worker_id ? `${report.assigned_worker_name || report.assigned_worker_username || 'عامل'} · ${report.work_started_at ? 'بدأ العمل' : 'استلمه'}` : 'بانتظار الاستلام'}</dd></div>
+          {report.assigned_at && <div><dt>تاريخ الإسناد</dt><dd>{fmtDate(report.assigned_at)}</dd></div>}
+        </>}
+      </dl></section>
+
+      {report.status === 'rejected' && <section className="dd-block rejection-reason"><h4>سبب الرفض</h4><p>{report.rejection_reason || 'لم يُسجل سبب.'}</p></section>}
+
       {(nearbyItems.length > 0 || (pending && nearby)) && <section className={`detail-section nearby-section ${pending && nearbyItems.length ? 'is-warning' : ''}`} aria-labelledby="nearby-title"><h4 id="nearby-title">بلاغات قريبة من التصنيف نفسه{nearbyItems.length > 0 && <span className="nearby-count">{number(nearbyItems.length)}</span>}</h4>
-        {nearbyItems.length ? <>{pending && <p className="nearby-hint"><CircleAlert size={15} />قد يكون هذا البلاغ مكررًا. قارن الصور والموقع قبل الاعتماد.</p>}<ul className="nearby-list">{nearbyItems.map((item) => <li key={item.id}><button type="button" onClick={() => onOpen?.(item.id)} aria-label={`فتح البلاغ ${item.id}`}>
+        {nearbyItems.length ? <><ul className="nearby-list">{nearbyItems.map((item) => <li key={item.id}><button type="button" onClick={() => onOpen?.(item.id)} aria-label={`فتح البلاغ ${item.id}`}>
           <span className="nearby-thumb">{imageUrl(item.image_url) ? <img src={imageUrl(item.image_url)} alt="" /> : <ImageIcon size={18} />}</span>
           <span className="nearby-main"><strong>بلاغ #{item.id}</strong><small>على بعد {number(item.distance_m)} م · {fmtDate(item.created_at)}</small>{item.description && <em>{item.description}</em>}</span>
           <StatusPill report={item} /></button></li>)}</ul><small className="nearby-note">تظهر بلاغات التصنيف نفسه خلال {number(nearby.radius_m)} م التي لم تُرفض، والمحلولة منها خلال آخر 30 يومًا فقط. النقاط الذهبية على الخريطة أعلاه.</small></>
           : <p className="nearby-empty">لا توجد بلاغات أخرى من التصنيف نفسه خلال {number(nearby.radius_m)} م.</p>}
       </section>}
-      <section className="detail-section"><h4>مقدم البلاغ <span className="private-tag">للموظف فقط</span></h4><div className="info-grid"><div><small>الاسم</small><strong>{report.reporter_name || 'غير محدد'}</strong></div><div><small>رقم الهاتف</small><strong dir="ltr">{report.reporter_phone || '—'}</strong></div></div></section>
+
       {latestVerification && <section className="detail-section verification-summary"><h4>التحقق الميداني قبل الاعتماد</h4><p>جهة التحقق: <strong>{agencyTeams[latestVerification.agency] || agencies[latestVerification.agency]}</strong></p><p>سبب الطلب: {latestVerification.request_note}</p><small>أُرسل الطلب: {fmtDate(latestVerification.requested_at)}</small><p><strong>{verificationOpen ? (latestVerification.claimed_at ? 'استلم الفريق المهمة، بانتظار النتيجة' : 'بانتظار استلام جهة العمل') : verificationResults[latestVerification.result]}</strong></p>{latestVerification.result_note && <p>ملاحظة النتيجة: {latestVerification.result_note}</p>}{latestVerification.completed_at && <small>وقت الرد: {fmtDate(latestVerification.completed_at)}</small>}</section>}
       {latestVerification?.corrected_at && <section className="detail-section verification-summary"><h4>تصحيح الموقع قبل النشر</h4><p>صحح الموظف موقع البلاغ بعد رد جهة العمل.</p><small>{fmtDate(latestVerification.corrected_at)}</small></section>}
-      {pendingFieldIssue && <section className="detail-section field-issue-highlight"><h4>ملاحظة الفريق · تحتاج قرارًا</h4><p><strong>{fieldIssueReasons[pendingFieldIssue.reason]}</strong> · {agencyTeams[report.assigned_agency] || 'فريق جهة العمل'}</p><p>{pendingFieldIssue.note}</p><small>{fmtDate(pendingFieldIssue.raised_at)}</small></section>}
-      {pendingCompletion && <section className="detail-section completion-review-highlight"><h4>إنجاز العمل · بانتظار تأكيدك</h4><p>أبلغ {pendingCompletion.worker_name || pendingCompletion.worker_username || 'العامل الميداني'} بإتمام العمل.</p>{pendingCompletion.note && <p>وصف العمل: {pendingCompletion.note}</p>}<small>وقت الإرسال: {fmtDate(pendingCompletion.submitted_at)}</small></section>}
-      {data.completions?.some((item) => item.after_image_url) && <section className="detail-section completion-evidence"><h4>صور الإصلاح للمراجعة</h4><div className="completion-photo-compare"><div><strong>قبل الإصلاح · صورة البلاغ</strong><button type="button" onClick={() => { setExpandedImage(image); setZoom(1); }}><img src={image} alt="صورة المشكلة قبل الإصلاح" /></button></div>{data.completions.filter((item) => item.after_image_url).map((item) => <div key={item.id}><strong>بعد الإصلاح · {item.decision === 'confirmed' ? 'مؤكد' : item.decision === 'returned' ? 'أُعيد للعمل' : 'بانتظار القرار'}</strong><button type="button" onClick={() => { setExpandedImage(imageUrl(item.after_image_url)); setZoom(1); }}><img src={imageUrl(item.after_image_url)} alt={`صورة الإصلاح المرسلة في ${fmtDate(item.submitted_at)}`} /></button><small>أُرسلت: {fmtDate(item.submitted_at)}</small>{item.photo_latitude !== null && item.photo_longitude !== null ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${item.photo_latitude},${item.photo_longitude}`)}`} target="_blank" rel="noopener noreferrer"><MapPin size={14} />موقع الجهاز عند التصوير{item.photo_accuracy_m !== null ? ` · دقة تقريبية ${Math.round(Number(item.photo_accuracy_m))} م` : ''}</a> : <small>لم يتوفر موقع الجهاز عند التصوير.</small>}</div>)}</div><p className="completion-evidence-hint">قارن الصورتين والموقع قبل تأكيد الحل؛ الصورة وحدها لا تثبت اكتمال العمل.</p></section>}
-      {report.approved_at && report.status !== 'rejected' && <section className="detail-section"><h4>إسناد البلاغ <span className="private-tag">للموظف فقط</span></h4>
-        {report.assigned_agency ? <p>جهة العمل: <strong>{agencies[report.assigned_agency] || report.assigned_agency}</strong><br />الفريق المسؤول: <strong>{agencyTeams[report.assigned_agency] || 'فريق جهة العمل'}</strong> · {report.assigned_worker_id ? (report.work_started_at ? 'بدأ العمل' : 'تم استلام البلاغ') : 'بانتظار الاستلام'}</p> : <p>لم تُحدّد جهة عمل لهذا البلاغ القديم.</p>}
-        {report.assigned_at && <small className="assignment-time">تاريخ الإسناد: {fmtDate(report.assigned_at)}</small>}
-      </section>}
-      {report.status === 'rejected' && <section className="detail-section rejection-reason"><h4>سبب الرفض</h4><p>{report.rejection_reason || 'لم يُسجل سبب.'}</p></section>}
-      <section className="detail-section"><h4>سجل المتابعة</h4><div className="timeline">{timeline.map((event) => <div className="timeline-item" key={event.key}><i /><span><strong>{event.title}</strong><small>{fmtDate(event.at)}{event.actor ? ` · ${event.actor}` : ''}</small>{event.detail && <em>{event.detail}</em>}</span></div>)}</div></section>
+
+      <section className="dd-block"><h4>سجل المتابعة</h4><div className="timeline">{timeline.map((event) => <div className="timeline-item" key={event.key}><i /><span><strong>{event.title}</strong><small>{fmtDate(event.at)}{event.actor ? ` · ${event.actor}` : ''}</small>{event.detail && <em>{event.detail}</em>}</span></div>)}</div></section>
     </div>
       {(pending || approvedNew || inProgress) && <div className={`drawer-actions ${pendingFieldIssue ? 'field-review-actions' : ''}`}>
         {pendingFieldIssue ? <><button className="button button-gold" onClick={() => setModal('fieldContinue')}><Check size={18} />متابعة البلاغ</button><button className="button button-quiet" onClick={() => setModal('fieldCorrect')}><MapPin size={18} />تصحيح الموقع</button><button className="button button-danger-quiet" onClick={() => setModal('fieldReject')}>رفض البلاغ</button></> : <>

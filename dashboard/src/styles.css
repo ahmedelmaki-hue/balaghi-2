@@ -845,3 +845,57 @@ button.ov-stat:hover{box-shadow:0 6px 18px rgba(18,50,63,.09);transform:translat
   .ac-table td[data-cell="details"]{grid-area:details;max-width:none}
   .ac-table td[data-cell="details"].is-empty{display:none}
 }
+
+/* Report details panel — wider, with what needs a decision first and the photo and
+   map side by side (after 21st's detail sheet layouts). Plain text, brand colours. */
+.detail-drawer.dd{width:min(760px,100%)}
+.dd-head{align-items:flex-start;padding:16px 22px}
+.dd-head h2{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;font-size:20px;font-weight:800}
+.dd-head-cat{font-size:15px;font-weight:700;color:#5b6a6f}
+.dd-head-date{display:block;margin-top:2px;font-size:12px;color:#5b6a6f}
+.dd-head .drawer-head-actions{gap:8px}
+.dd-content{display:flex;flex-direction:column;gap:14px;padding:18px 22px 26px}
+.dd-content>.detail-section{margin:0}
+
+.dd-decide{padding:16px 18px;border:1px solid #f0d59c;border-inline-start:4px solid #d99a1e;border-radius:14px;background:#fffaf0}
+.dd-decide h3{margin:0 0 4px;font-size:16px;font-weight:800;color:#12323f}
+.dd-decide p{margin:0 0 4px;font-size:14px;line-height:1.7;color:#3f4d52}
+.dd-decide small{display:block;margin-top:4px;font-size:12px;color:#7a5408}
+.dd-decide.is-issue{border-color:#e9b9b3;border-inline-start-color:#c93636;background:#fff5f3}
+.dd-decide.is-issue p strong{color:#a5281f}
+.dd-decide.is-done{border-color:#b9dbc5;border-inline-start-color:#4b9a67;background:#f1faf3}
+.dd-decide-warn{display:inline-flex;align-items:center;gap:6px;margin:6px 0 2px;padding:6px 12px;border:1px solid #f0d59c;border-radius:999px;background:#fff;color:#7a5408;font-size:13px;font-weight:700;text-decoration:none}
+.dd-decide-warn:hover{background:#fdf3df}
+.dd-category{display:flex;align-items:flex-end;flex-wrap:wrap;gap:10px 16px;margin-top:12px;padding-top:12px;border-top:1px solid #f3e6c7}
+.dd-category .assignment-picker{margin:0;min-width:180px}
+.dd-category>span{font-size:13px;color:#5b6a6f;padding-bottom:10px}
+.dd-category>span strong{color:#12323f}
+
+.dd-media{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.dd-media .detail-image{height:280px;border-radius:14px}
+.dd-place{display:flex;flex-direction:column;border:1px solid #e9e4db;border-radius:14px;background:#fff;overflow:hidden}
+.dd-place .detail-map{flex:1;min-height:190px;height:auto;margin:0;border:0;border-radius:0}
+.dd-place .detail-location{margin:0;padding:10px 12px 4px;font-size:14px;font-weight:700;color:#12323f}
+.dd-place .detail-location svg{color:#be820e}
+.dd-place-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px 10px}
+.dd-place-foot .coordinates{margin:0;font-size:11px;color:#8a969a}
+.dd-place-foot a{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:#126477;text-decoration:none}
+.dd-place-foot a:hover{text-decoration:underline}
+
+.dd-block{padding:16px 18px;border:1px solid #eee8de;border-radius:14px;background:#fff}
+.dd-block h4{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;font-weight:800;color:#5b6a6f}
+.dd-block>p{margin:0;font-size:15px;font-weight:600;line-height:1.8;color:#12323f}
+.dd-block>p.is-empty{font-weight:500;font-style:italic;color:#8a969a}
+.dd-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px;margin:0}
+.dd-facts dt{font-size:12px;color:#5b6a6f}
+.dd-facts dd{margin:2px 0 0;font-size:14px;font-weight:700;color:#12323f;text-align:right}
+.dd .timeline-item strong{font-size:13px}
+
+@media(max-width:720px){
+  .dd-head{padding:14px 16px}
+  .dd-content{padding:14px 14px 22px}
+  .dd-media{grid-template-columns:1fr}
+  .dd-media .detail-image{height:230px}
+  .dd-place .detail-map{min-height:180px}
+  .dd-facts{grid-template-columns:1fr 1fr;gap:10px 14px}
+}
