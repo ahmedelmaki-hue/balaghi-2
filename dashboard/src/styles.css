@@ -811,3 +811,16 @@ button.ov-stat:hover{box-shadow:0 6px 18px rgba(18,50,63,.09);transform:translat
   .ac-search input{width:100%;min-width:0;flex:1}
   .ac-segment button{flex:1}
 }
+
+/* Citizens — the accounts table with phone, report count and sign-up date columns. */
+.ac-phone{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.ac-count{font-size:15px;font-weight:800}
+.ac-none{font-size:13px;font-weight:600;color:#8a969a}
+.ac-who strong.is-empty{color:#8a969a;font-weight:600;font-style:italic}
+@media(max-width:900px){
+  .ac-table.is-citizens tbody tr{grid-template-areas:"citizen status" "phone phone" "reports joined" "actions actions"}
+  .ac-table td[data-cell="citizen"]{grid-area:citizen}
+  .ac-table td[data-cell="phone"]{grid-area:phone;text-align:right}
+  .ac-table td[data-cell="reports"]{grid-area:reports;font-size:13px;font-weight:700}
+  .ac-table td[data-cell="joined"]{grid-area:joined;font-size:12px;text-align:left}
+}

@@ -243,6 +243,16 @@ export function CitizensPage({ onMenu, onToast }) {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
   const { result, loading, error } = usePagedList(adminApi.citizens, filters, tick);
+  const [statusCount, setStatusCount] = useState({});
+  const [loadedAt, setLoadedAt] = useState(null);
+  useEffect(() => {
+    let active = true;
+    Promise.all(['', 'active', 'inactive'].map((status) => adminApi.citizens({ status, limit: 1 }).then((data) => [status, data.total])))
+      .then((pairs) => { if (active) setStatusCount(Object.fromEntries(pairs)); })
+      .catch(() => { if (active) setStatusCount({}); });
+    return () => { active = false; };
+  }, [tick]);
+  useEffect(() => { if (result) setLoadedAt(new Date()); }, [result]);
   const change = (key, value) => setFilters((current) => ({ ...current, [key]: value, page: 1 }));
   const submit = async () => {
     if (busy || !target) return;
@@ -255,26 +265,53 @@ export function CitizensPage({ onMenu, onToast }) {
     } catch (cause) { setFormError(errorText(cause)); }
     finally { setBusy(false); }
   };
-  return <>
-    <PageHeading eyebrow="إدارة الحسابات" title="المواطنون" subtitle="ابحث عن حساب مواطن، وأوقفه مع ذكر السبب عند إساءة الاستخدام. تبقى بلاغاته السابقة كما هي." action="تحديث القائمة" onAction={() => setTick((n) => n + 1)} onMenu={onMenu} />
-    <section className="panel reports-panel">
-      <div className="panel-heading"><div><span className="eyebrow">حسابات تطبيق المواطن</span><h2>المواطنون المسجلون</h2></div><span className="count-chip">{number(result?.total || 0)} مواطن</span></div>
-      <div className="reports-search-row"><form className="pending-search reports-search" onSubmit={(e) => { e.preventDefault(); change('search', search.trim()); }}><Search size={17} /><input type="search" value={search} onChange={(e) => { setSearch(e.target.value); if (!e.target.value && filters.search) change('search', ''); }} placeholder="ابحث بالاسم أو رقم الهاتف" aria-label="ابحث بالاسم أو رقم الهاتف" /><button type="submit">بحث</button></form></div>
-      <div className="filters"><label>الحالة<select value={filters.status} onChange={(e) => change('status', e.target.value)}><option value="">الكل</option><option value="active">نشط</option><option value="inactive">موقوف</option></select></label>
-        {(filters.status || filters.search) && <button className="clear-filters" onClick={() => { setFilters(empty); setSearch(''); }}>مسح الفلاتر</button>}</div>
-      {loading && !result ? <LoadingState /> : error ? <EmptyState icon={CircleAlert} title="تعذّر تحميل المواطنين" detail={error} onRetry={() => setTick((n) => n + 1)} />
-        : !result?.items.length ? <EmptyState icon={Contact} title="لا يوجد مواطنون مطابقون" detail="غيّر البحث أو الفلتر." />
-          : <><div className="table-scroll"><table className="report-table admin-table"><thead><tr><th>المواطن</th><th>رقم الهاتف</th><th>البلاغات</th><th>تاريخ التسجيل</th><th>الحالة</th><th>الإجراء</th></tr></thead>
-            <tbody>{result.items.map((item) => <tr key={item.id}>
-              <td><strong>{item.full_name || 'لم يكمل اسمه'}</strong></td>
-              <td dir="ltr" className="phone-cell">{localPhone(item.phone)}</td>
-              <td>{number(item.report_count)}</td>
-              <td className="date-cell">{fmtDate(item.created_at)}</td>
-              <td><span className="account-status"><span className={`status-pill ${item.is_active ? 'resolved' : 'rejected'}`}><i />{item.is_active ? 'نشط' : 'موقوف'}</span>{!item.is_active && item.deactivated_reason && <small className="account-reason">{item.deactivated_reason}</small>}</span></td>
-              <td><button className={`button ${item.is_active ? 'button-danger-quiet' : 'button-quiet'} admin-row-action`} onClick={() => { setTarget(item); setReason(''); setFormError(''); }}>{item.is_active ? <><Ban size={15} />إيقاف</> : <><RotateCcw size={15} />إعادة التفعيل</>}</button></td>
-            </tr>)}</tbody></table></div>
-            <Pagination result={result} page={filters.page} setPage={(page) => setFilters((current) => ({ ...current, page }))} /></>}
+  const openTarget = (item) => { setTarget(item); setReason(''); setFormError(''); };
+  const filtered = Boolean(filters.status || filters.search);
+  return <div className="rl ac">
+    <header className="pr-head">
+      <div className="pr-title">
+        <button className="icon-button mobile-menu" aria-label="فتح القائمة" onClick={onMenu}><Menu size={22} /></button>
+        <div><span className="eyebrow">إدارة الحسابات</span>
+          <h1>المواطنون{statusCount[''] !== undefined && <span className="pr-count num">{number(statusCount[''])}</span>}</h1>
+          <p>ابحث عن حساب مواطن، وأوقفه مع ذكر السبب عند إساءة الاستخدام. تبقى بلاغاته السابقة كما هي.</p></div>
+      </div>
+      <button type="button" className="pr-refresh" onClick={() => setTick((n) => n + 1)}>
+        <RefreshCw size={16} />{loadedAt ? <>تحديث · <span className="num">{clockTime.format(loadedAt)}</span></> : 'تحديث'}
+      </button>
+    </header>
+
+    <section className="rl-filters" aria-label="تصفية المواطنين">
+      <div className="rl-stages" role="group" aria-label="الحالة">
+        {[['', 'كل المواطنين'], ['active', 'نشط'], ['inactive', 'موقوف']].map(([key, label]) => <button type="button" key={key || 'all'} className={filters.status === key ? 'is-active' : ''} aria-pressed={filters.status === key} onClick={() => change('status', key)}>
+          {label}{statusCount[key] !== undefined && <small className="num">{number(statusCount[key])}</small>}
+        </button>)}
+      </div>
+      <div className="rl-controls">
+        <form className="pr-search ac-search" onSubmit={(e) => { e.preventDefault(); change('search', search.trim()); }} role="search"><Search size={16} /><input type="search" value={search} onChange={(e) => { setSearch(e.target.value); if (!e.target.value && filters.search) change('search', ''); }} placeholder="الاسم أو رقم الهاتف" aria-label="ابحث بالاسم أو رقم الهاتف" /><button type="submit">بحث</button></form>
+        {filtered && <span className="rl-active"><button type="button" onClick={() => { setFilters(empty); setSearch(''); }}>مسح الفلاتر</button></span>}
+      </div>
     </section>
+
+    {loading && !result ? <LoadingState /> : error ? <EmptyState icon={CircleAlert} title="تعذّر تحميل المواطنين" detail={error} onRetry={() => setTick((n) => n + 1)} />
+      : !result?.items.length ? <div className="rl-card rl-empty"><EmptyState icon={Contact} title="لا يوجد مواطنون مطابقون" detail={filtered ? 'غيّر البحث أو الفلتر.' : 'سيظهر هنا كل من يسجّل في تطبيق المواطن.'} /></div>
+        : <section className="rl-card"><div className="rl-scroll"><table className="ac-table is-citizens">
+          <thead><tr><th scope="col">المواطن</th><th scope="col">رقم الهاتف</th><th scope="col">البلاغات</th><th scope="col">سجّل في</th><th scope="col">الحالة</th><th scope="col"><span className="sr-only">الإجراء</span></th></tr></thead>
+          <tbody>{result.items.map((item) => <tr key={item.id} className={item.is_active ? '' : 'is-off'}>
+            <td data-cell="citizen"><div className="ac-who"><span><strong className={item.full_name ? '' : 'is-empty'}>{item.full_name || 'لم يكمل اسمه'}</strong></span></div></td>
+            <td data-cell="phone" className="ac-phone" dir="ltr">{localPhone(item.phone)}</td>
+            <td data-cell="reports" className="ac-count"><span className="ac-label">البلاغات: </span>{item.report_count ? <span className="num">{number(item.report_count)}</span> : <span className="ac-none">لا بلاغات</span>}</td>
+            <td data-cell="joined" className="ac-date"><span className="ac-label">سجّل في: </span><time dateTime={item.created_at} title={fmtDate(item.created_at)}>{dayOnly.format(new Date(item.created_at))}</time></td>
+            <td data-cell="status"><div className="ac-state">
+              <span className={`ac-status ${item.is_active ? 'is-on' : 'is-off'}`}><i />{item.is_active ? 'نشط' : 'موقوف'}</span>
+              {!item.is_active && item.deactivated_reason && <small className="ac-reason">{item.deactivated_reason}</small>}
+            </div></td>
+            <td data-cell="actions"><div className="ac-actions">
+              <button type="button" className={`ac-btn ${item.is_active ? 'is-danger' : 'is-go'}`} aria-label={`${item.is_active ? 'إيقاف' : 'إعادة تفعيل'} ${item.full_name || localPhone(item.phone)}`} onClick={() => openTarget(item)}>{item.is_active ? <><Ban size={15} />إيقاف</> : <><RotateCcw size={15} />إعادة التفعيل</>}</button>
+            </div></td>
+          </tr>)}</tbody>
+        </table></div>
+        {result.total_pages > 1 && <footer className="pr-pages"><span>صفحة <span className="num">{number(result.page)}</span> من <span className="num">{number(result.total_pages)}</span> · <span className="num">{number(result.total)}</span> مواطن</span><div><button className="icon-button" aria-label="الصفحة السابقة" disabled={filters.page <= 1} onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}><ChevronRight size={18} /></button><button className="icon-button" aria-label="الصفحة التالية" disabled={filters.page >= result.total_pages} onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}><ChevronLeft size={18} /></button></div></footer>}
+        </section>}
     {target && <ModalShell label="حالة حساب المواطن" icon={target.is_active ? Ban : RotateCcw} danger={target.is_active} onClose={() => !busy && setTarget(null)}>
       <h3>{target.is_active ? 'إيقاف حساب المواطن؟' : 'إعادة تفعيل حساب المواطن؟'}</h3>
       <p>{target.full_name || 'مواطن'} · <span dir="ltr">{localPhone(target.phone)}</span>. {target.is_active ? 'لن يستطيع الدخول أو إرسال بلاغات جديدة، وسيظهر له أن حسابه موقوف. تبقى بلاغاته السابقة كما هي.' : 'يستطيع الدخول وإرسال البلاغات من جديد.'}</p>
@@ -282,7 +319,7 @@ export function CitizensPage({ onMenu, onToast }) {
       {formError && <div className="form-error" role="alert"><CircleAlert size={17} />{formError}</div>}
       <div className="modal-actions"><button className={`button ${target.is_active ? 'button-danger' : 'button-gold'}`} disabled={busy || (target.is_active && !reason.trim())} onClick={submit}>{target.is_active ? 'إيقاف الحساب' : 'إعادة التفعيل'}</button><button className="button button-quiet" disabled={busy} onClick={() => setTarget(null)}>إلغاء</button></div>
     </ModalShell>}
-  </>;
+  </div>;
 }
 
 function auditDetail(item) {
