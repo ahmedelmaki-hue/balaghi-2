@@ -1,7 +1,7 @@
 // The field worker's phone-sized page: checks, claims, start, concerns, finished work.
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Check, CheckCheck, CircleAlert, Clock3, Eye, FolderOpen, KeyRound, LogOut, MapPin, RefreshCw, ShieldCheck, X,
+  Check, CheckCheck, CircleAlert, Clock3, Eye, FolderOpen, KeyRound, LogOut, MapPin, Navigation, RefreshCw, ShieldCheck, X,
 } from 'lucide-react';
 import { fieldApi, imageUrl } from '../api.js';
 import CompletionCamera from '../CompletionCamera.jsx';
@@ -24,7 +24,46 @@ function useAutoRefresh(setTick, quiet) {
   }, [setTick, quiet]);
 }
 
-function FieldVerificationQueue() {
+const clockTime = new Intl.DateTimeFormat('ar-LY', { hour: 'numeric', minute: '2-digit' });
+const relativeTime = new Intl.RelativeTimeFormat('ar', { numeric: 'auto' });
+function since(value) {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
+  if (minutes < 60) return relativeTime.format(-minutes, 'minute');
+  if (minutes < 60 * 24) return relativeTime.format(-Math.round(minutes / 60), 'hour');
+  return relativeTime.format(-Math.round(minutes / 1440), 'day');
+}
+const mapLink = (report) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${Number(report.latitude)},${Number(report.longitude)}`)}`;
+
+// Where a report stands on the worker's path; the employee confirms the last step.
+const WORK_STEPS = ['الاستلام', 'بدء العمل', 'الإنجاز', 'تأكيد الموظف'];
+function workStep(report) {
+  if (report.status === 'resolved') return WORK_STEPS.length;
+  if (report.completion_pending) return 3;
+  if (report.status === 'in_progress') return 2;
+  return report.accepted_at ? 1 : 0;
+}
+function WorkSteps({ report }) {
+  const step = workStep(report);
+  return <ol className="wk-steps" aria-label={step < WORK_STEPS.length ? `الخطوة الحالية: ${WORK_STEPS[step]}` : 'اكتمل البلاغ'}>
+    {WORK_STEPS.map((label, index) => <li key={label} className={index < step ? 'is-done' : index === step ? 'is-now' : ''}><i aria-hidden="true">{index < step && <Check size={11} strokeWidth={3} />}</i>{label}</li>)}
+  </ol>;
+}
+
+// The photo and what the report is; shared by work cards and verification requests.
+function ReportSummary({ report, when, onPhoto }) {
+  const photo = imageUrl(report.image_url);
+  return <div className="wk-summary">
+    {photo ? <button type="button" className="wk-photo" onClick={onPhoto} aria-label={`فتح صورة البلاغ ${report.id} بحجم كامل`}><img src={photo} alt={`صورة البلاغ ${report.id}`} /></button>
+      : <div className="wk-photo"><CategoryIcon category={report.category} size={30} /></div>}
+    <div className="wk-summary-text">
+      <div className="wk-meta"><strong>{categoryName(report.category)}</strong><span className="num">#{report.id}</span><time dateTime={when} title={fmtDate(when)}>{since(when)}</time></div>
+      <p className={report.description ? 'wk-desc' : 'wk-desc is-empty'}>{report.description || 'لا يوجد وصف إضافي.'}</p>
+      <p className="wk-place"><MapPin size={14} />{report.address_text || 'الموقع محدد على الخريطة'}</p>
+    </div>
+  </div>;
+}
+
+function FieldVerificationQueue({ onChanged }) {
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -69,7 +108,7 @@ function FieldVerificationQueue() {
       if (action === 'claim') await fieldApi.claimVerification(item.id);
       else await fieldApi.respondVerification(item.id, draft.result, draft.note.trim());
       setNotice(action === 'claim' ? 'استلمت مهمة التحقق. افحص الموقع ثم أرسل النتيجة.' : 'وصلت نتيجة التحقق إلى الموظف. البلاغ ما زال غير منشور حتى يقرر بشأنه.');
-      setTick((value) => value + 1);
+      setTick((value) => value + 1); onChanged?.();
     } catch (cause) { setError(errorText(cause)); setTick((value) => value + 1); }
     finally { setBusyId(null); }
   };
@@ -77,15 +116,17 @@ function FieldVerificationQueue() {
     <p className="verification-hint">هذه البلاغات غير منشورة. افحص المشكلة في الموقع، ثم أرسل النتيجة للموظف. التحقق لا يعني بدء أعمال الإصلاح.</p>
     {notice && <div className="field-notice" role="status"><Check size={17} />{notice}</div>}
     {error && <div className="inline-error" role="alert"><CircleAlert size={17} />{error}<button onClick={() => setTick((value) => value + 1)}>إعادة المحاولة</button></div>}
-    {loading ? <LoadingState /> : items.length === 0 ? <EmptyState icon={ShieldCheck} title="لا توجد طلبات تحقق حاليًا" detail="ستظهر هنا البلاغات التي يحيلها الموظف إلى جهة عملك قبل اعتمادها." /> : <div className="verification-grid">{items.map((item) => <article className="panel verification-card" key={item.verification_id}>
-      <div className="verification-card-head"><div><span className="eyebrow">طلب تحقق · بلاغ #{item.id}</span><h2>{categoryName(item.category)}</h2></div><small>{fmtDate(item.requested_at)}</small></div>
-      {imageUrl(item.image_url) && <button className="verification-photo" onClick={() => setPreview(item)} aria-label={`عرض صورة البلاغ ${item.id} كاملة`}><img src={imageUrl(item.image_url)} alt={`صورة البلاغ ${item.id}`} /></button>}
-      <p><strong>وصف البلاغ:</strong> {item.description || 'لا يوجد وصف إضافي.'}</p>
-      <p className="verification-request-note"><strong>سبب طلب التحقق:</strong> {item.request_note}</p>
-      <a className="button button-quiet verification-map-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${Number(item.latitude)},${Number(item.longitude)}`)}`} target="_blank" rel="noopener noreferrer"><MapPin size={17} />فتح موقع المشكلة</a>
-      {!item.claimed_by ? <button className="button button-gold" disabled={busyId === item.id} onClick={() => act(item, 'claim')}>استلام مهمة التحقق</button> : <div className="verification-response"><label>نتيجة التحقق<select value={drafts[item.id]?.result || ''} onChange={(event) => setDrafts((current) => ({ ...current, [item.id]: { ...current[item.id], result: event.target.value } }))}><option value="">اختر النتيجة</option>{Object.entries(verificationResults).filter(([key]) => key !== 'cancelled').map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label>ملاحظتك للموظف<textarea value={drafts[item.id]?.note || ''} maxLength={500} rows={3} placeholder="اكتب ما تحققت منه في الموقع" onChange={(event) => setDrafts((current) => ({ ...current, [item.id]: { ...current[item.id], note: event.target.value } }))} /></label><button className="button button-gold" disabled={busyId === item.id || !drafts[item.id]?.result || !drafts[item.id]?.note?.trim()} onClick={() => act(item, 'respond')}>{busyId === item.id ? 'جارٍ الإرسال...' : 'إرسال النتيجة للموظف'}</button></div>}
+    {loading ? <LoadingState /> : items.length === 0 ? <EmptyState icon={ShieldCheck} title="لا توجد طلبات تحقق حاليًا" detail="ستظهر هنا البلاغات التي يحيلها الموظف إلى جهة عملك قبل اعتمادها." /> : <div className="wk-grid">{items.map((item) => <article className="wk-card" key={item.verification_id}>
+      <ReportSummary report={item} when={item.requested_at} onPhoto={() => setPreview(item)} />
+      <p className="wk-ask"><strong>سبب طلب التحقق</strong>{item.request_note}</p>
+      <a className="wk-secondary wk-map-full" href={mapLink(item)} target="_blank" rel="noopener noreferrer"><Navigation size={17} />الذهاب إلى الموقع</a>
+      {!item.claimed_by ? <button type="button" className="wk-primary" disabled={busyId === item.id} onClick={() => act(item, 'claim')}><Check size={18} />استلام مهمة التحقق</button> : <div className="wk-response">
+        <fieldset className="wk-results"><legend>نتيجة التحقق</legend><div>{Object.entries(verificationResults).filter(([key]) => key !== 'cancelled').map(([key, label]) => <label key={key} className={drafts[item.id]?.result === key ? 'is-on' : ''}><input type="radio" name={`result-${item.id}`} value={key} checked={drafts[item.id]?.result === key} onChange={() => setDrafts((current) => ({ ...current, [item.id]: { ...current[item.id], result: key } }))} />{label}</label>)}</div></fieldset>
+        <label className="wk-note-field">ملاحظتك للموظف<textarea value={drafts[item.id]?.note || ''} maxLength={500} rows={3} placeholder="اكتب ما تحققت منه في الموقع" onChange={(event) => setDrafts((current) => ({ ...current, [item.id]: { ...current[item.id], note: event.target.value } }))} /></label>
+        <button type="button" className="wk-primary" disabled={busyId === item.id || !drafts[item.id]?.result || !drafts[item.id]?.note?.trim()} onClick={() => act(item, 'respond')}>{busyId === item.id ? 'جارٍ الإرسال...' : 'إرسال النتيجة للموظف'}</button>
+      </div>}
     </article>)}</div>}
-    {totalPages > 1 && <div className="field-pages"><button className="button button-quiet" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>السابق</button><span>{number(page)} / {number(totalPages)}</span><button className="button button-quiet" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>التالي</button></div>}
+    {totalPages > 1 && <div className="wk-pages"><button type="button" className="wk-secondary" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>السابق</button><span className="num">{number(page)} / {number(totalPages)}</span><button type="button" className="wk-secondary" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>التالي</button></div>}
     {preview && <div className="image-modal" role="dialog" aria-modal="true" aria-label={`صورة البلاغ ${preview.id} كاملة`}><button className="image-modal-close" onClick={() => setPreview(null)} aria-label="إغلاق الصورة"><X size={22} /></button><div className="image-modal-stage"><img src={imageUrl(preview.image_url)} alt={`صورة البلاغ ${preview.id} كاملة`} /></div></div>}
   </section>;
 }
@@ -116,8 +157,18 @@ export function FieldWorkerPage({ user, onLogout, onPassword }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [tick, setTick] = useState(0);
+  const [counts, setCounts] = useState({});
+  const [countTick, setCountTick] = useState(0);
+  const [loadedAt, setLoadedAt] = useState(null);
   const quiet = useRef(false);
   useAutoRefresh(setTick, quiet);
+  useEffect(() => {
+    let active = true;
+    Promise.all([fieldApi.assigned({ view: 'active', limit: 1 }), fieldApi.assigned({ view: 'resolved', limit: 1 }), fieldApi.verifications({ limit: 1 })])
+      .then(([reports, resolved, verifications]) => { if (active) setCounts({ reports: reports.total, resolved: resolved.total, verifications: verifications.total }); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [tick, countTick]);
   useEffect(() => {
     let active = true;
     const silent = quiet.current;
@@ -126,7 +177,7 @@ export function FieldWorkerPage({ user, onLogout, onPassword }) {
     fieldApi.assigned({ page, view: tab === 'resolved' ? 'resolved' : 'active' })
       .then((result) => { if (active) {
         if (page > Math.max(result.total_pages, 1)) { setPage(Math.max(result.total_pages, 1)); return; }
-        setItems(result.items); setTotalPages(result.total_pages || 1); setError('');
+        setItems(result.items); setTotalPages(result.total_pages || 1); setError(''); setLoadedAt(new Date());
       } })
       .catch((cause) => { if (active && !silent) setError(errorText(cause)); })
       .finally(() => { if (active) setLoading(false); });
@@ -201,6 +252,14 @@ export function FieldWorkerPage({ user, onLogout, onPassword }) {
   const detailsReport = items.find((report) => report.id === detailsId);
   const imageReport = items.find((report) => report.id === imageId);
   const openImage = (id) => { setImageZoom(1); setImageId(id); };
+  // What needs the worker first: work under way, then claimed, then free to claim.
+  const groups = tab === 'resolved' ? [{ key: 'resolved', items }] : [
+    { key: 'working', title: 'قيد العمل', items: items.filter((report) => report.status === 'in_progress') },
+    { key: 'claimed', title: 'استلمتها ولم تبدأ', items: items.filter((report) => report.status === 'new' && report.accepted_at) },
+    { key: 'open', title: 'متاحة للاستلام', items: items.filter((report) => report.status === 'new' && !report.accepted_at) },
+  ].filter((group) => group.items.length);
+  const TABS = [['reports', 'العمل'], ['verifications', 'التحقق'], ['resolved', 'المنتهية']];
+  const heading = { reports: 'بلاغات جهتك', verifications: 'طلبات التحقق', resolved: 'البلاغات المنتهية' }[tab];
   useEffect(() => {
     const closeOnEscape = (event) => {
       if (event.key !== 'Escape') return;
@@ -213,23 +272,50 @@ export function FieldWorkerPage({ user, onLogout, onPassword }) {
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [imageId, issueId, completionId, detailsId, confirmId, busyId]);
-  return <main className="field-layout" dir="rtl"><header className="field-header"><Brand compact /><div><span>{user.full_name || user.staff_username}</span><button className="button button-quiet" onClick={onPassword} aria-label="تغيير كلمة المرور" title="تغيير كلمة المرور"><KeyRound size={16} /></button><button className="button button-quiet" onClick={onLogout}><LogOut size={16} />خروج</button></div></header>
-    <div className="field-content"><div className="field-intro"><span className="eyebrow">مساحة العمل الميداني</span><h1>{tab === 'verifications' ? 'طلبات التحقق قبل الاعتماد' : tab === 'resolved' ? 'البلاغات المنتهية' : 'بلاغات جهة عملك'}</h1><p>{agencies[user.agency] || 'البلاغات المسندة إلى جهتك'} · {tab === 'verifications' ? 'هذه الطلبات تنتظر فحصًا ميدانيًا قبل قرار النشر.' : tab === 'resolved' ? 'البلاغات التي أكّد الموظف حلها بعد إنجازك للعمل.' : 'استلم البلاغ أولًا، ثم أكد بدء العمل عند وصولك وبدء المعالجة فعليًا. عندها تتغير حالة البلاغ للمواطن.'}</p>{tab !== 'verifications' && <button className="button button-quiet" onClick={() => setTick((value) => value + 1)}><RefreshCw size={16} />تحديث البلاغات</button>}</div>
-      <div className="field-work-tabs" role="tablist" aria-label="مهام جهة العمل"><button role="tab" aria-selected={tab === 'reports'} className={`button ${tab === 'reports' ? 'button-gold' : 'button-quiet'}`} onClick={() => { setTab('reports'); setPage(1); }}>بلاغات العمل</button><button role="tab" aria-selected={tab === 'resolved'} className={`button ${tab === 'resolved' ? 'button-gold' : 'button-quiet'}`} onClick={() => { setTab('resolved'); setPage(1); }}>البلاغات المنتهية</button><button role="tab" aria-selected={tab === 'verifications'} className={`button ${tab === 'verifications' ? 'button-gold' : 'button-quiet'}`} onClick={() => { setTab('verifications'); setPage(1); }}>طلبات التحقق قبل الاعتماد</button></div>
-      {tab === 'verifications' ? <FieldVerificationQueue /> : <>
+  return <main className="field-layout" dir="rtl"><header className="field-header wk-header"><Brand compact /><div><span className="wk-user">{user.full_name || user.staff_username}</span><button type="button" className="wk-icon" onClick={onPassword} aria-label="تغيير كلمة المرور" title="تغيير كلمة المرور"><KeyRound size={18} /></button><button type="button" className="wk-icon" onClick={onLogout} aria-label="تسجيل الخروج" title="تسجيل الخروج"><LogOut size={18} /></button></div></header>
+    <div className="field-content rl wk">
+      <header className="wk-head">
+        <div><span className="eyebrow">{agencies[user.agency] || 'جهة العمل'}</span>
+          <h1>{heading}{counts[tab] !== undefined && <span className="pr-count num">{number(counts[tab])}</span>}</h1></div>
+        <button type="button" className="pr-refresh" onClick={() => setTick((value) => value + 1)}><RefreshCw size={16} />{loadedAt ? <span className="num">{clockTime.format(loadedAt)}</span> : 'تحديث'}<span className="sr-only">تحديث البلاغات</span></button>
+      </header>
+      <div className="wk-tabs" role="tablist" aria-label="مهام جهة العمل">{TABS.map(([key, label]) => <button type="button" key={key} role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => { setTab(key); setPage(1); }}>{label}{counts[key] !== undefined && <small className="num">{number(counts[key])}</small>}</button>)}</div>
+      {tab === 'verifications' ? <FieldVerificationQueue onChanged={() => setCountTick((value) => value + 1)} /> : <>
       {notice && <div className="field-notice" role="status"><Check size={17} />{notice}</div>}
       {error && <div className="inline-error" role="alert"><CircleAlert size={17} />{error}<button onClick={() => setTick((value) => value + 1)}>إعادة المحاولة</button></div>}
-      {loading ? <LoadingState /> : items.length === 0 ? <EmptyState icon={FolderOpen} title={tab === 'resolved' ? 'لا توجد بلاغات منتهية' : 'لا توجد بلاغات لدى جهة عملك'} detail={tab === 'resolved' ? 'ستظهر هنا البلاغات التي يؤكد الموظف حلها.' : 'ستظهر هنا البلاغات التي تُعتمد وتُسند تلقائيًا إلى جهتك.'} /> : <div className="field-grid">{items.map((report) => <article className="field-card" key={report.id}>
-        {imageUrl(report.image_url) ? <button type="button" className="field-card-image field-card-image-open" onClick={() => openImage(report.id)} aria-label={`فتح صورة البلاغ ${report.id} بحجم كامل`}><img src={imageUrl(report.image_url)} alt={`صورة البلاغ ${report.id}`} /></button> : <div className="field-card-image"><CategoryIcon category={report.category} size={38} /></div>}
-        <div className="field-card-content">
-          <div className="field-card-actions">{report.field_issue_pending ? <span className="field-progress-label">بانتظار مراجعة الموظف</span> : <>{report.status === 'new' && (report.accepted_at ? <button type="button" className="button button-gold" disabled={busyId === report.id} onClick={() => setConfirmId(report.id)}><Clock3 size={17} />بدأنا العمل</button> : <button type="button" className="button button-gold" disabled={busyId === report.id} onClick={() => perform(report.id, 'accept')}><Check size={17} />استلام البلاغ</button>)}{report.status === 'in_progress' && (report.completion_pending ? <span className="field-progress-label">بانتظار تأكيد الموظف</span> : <button type="button" className="button button-gold" disabled={busyId === report.id} onClick={() => { closeCompletion(); setCompletionId(report.id); }}><CheckCheck size={17} />تم إنجاز العمل</button>)}</>}<button type="button" className="button button-quiet" onClick={() => setDetailsId(report.id)}><Eye size={17} />تفاصيل البلاغ</button></div>
+      {loading ? <LoadingState /> : items.length === 0 ? <EmptyState icon={FolderOpen} title={tab === 'resolved' ? 'لا توجد بلاغات منتهية' : 'لا توجد بلاغات لدى جهة عملك'} detail={tab === 'resolved' ? 'ستظهر هنا البلاغات التي يؤكد الموظف حلها.' : 'ستظهر هنا البلاغات التي تُعتمد وتُسند تلقائيًا إلى جهتك.'} /> : groups.map((group) => <section className="wk-group" key={group.key} aria-label={group.title || heading}>
+        {group.title && <h2>{group.title}<small className="num">{number(group.items.length)}</small></h2>}
+        <div className="wk-grid">{group.items.map((report) => <article className="wk-card" key={report.id}>
+          <ReportSummary report={report} when={tab === 'resolved' ? report.updated_at : report.created_at} onPhoto={() => openImage(report.id)} />
+          <WorkSteps report={report} />
           {report.field_issue_pending && <p className="field-return-note"><CircleAlert size={16} />ملاحظتك قيد مراجعة الموظف: {report.field_issue_note}</p>}
           {report.status !== 'resolved' && report.completion_return_note && <p className="field-return-note"><CircleAlert size={16} />أعاده الموظف للعمل: {report.completion_return_note}</p>}
-        </div></article>)}</div>}
-      {totalPages > 1 && <div className="field-pages"><button className="button button-quiet" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>السابق</button><span>{number(page)} / {number(totalPages)}</span><button className="button button-quiet" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>التالي</button></div>}
+          {report.field_issue_pending ? <p className="wk-waiting">بانتظار مراجعة الموظف</p> : <>
+            {report.status === 'new' && (report.accepted_at
+              ? <button type="button" className="wk-primary" disabled={busyId === report.id} onClick={() => setConfirmId(report.id)}><Clock3 size={18} />بدأنا العمل</button>
+              : <button type="button" className="wk-primary" disabled={busyId === report.id} onClick={() => perform(report.id, 'accept')}><Check size={18} />استلام البلاغ</button>)}
+            {report.status === 'in_progress' && (report.completion_pending
+              ? <p className="wk-waiting">بانتظار تأكيد الموظف</p>
+              : <button type="button" className="wk-primary" disabled={busyId === report.id} onClick={() => { closeCompletion(); setCompletionId(report.id); }}><CheckCheck size={18} />تم إنجاز العمل</button>)}
+          </>}
+          <div className="wk-secondaries">
+            {report.status !== 'resolved' && <a className="wk-secondary" href={mapLink(report)} target="_blank" rel="noopener noreferrer"><Navigation size={17} />الموقع</a>}
+            <button type="button" className="wk-secondary" onClick={() => setDetailsId(report.id)}><Eye size={17} />التفاصيل</button>
+          </div>
+        </article>)}</div>
+      </section>)}
+      {totalPages > 1 && <div className="wk-pages"><button type="button" className="wk-secondary" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>السابق</button><span className="num">{number(page)} / {number(totalPages)}</span><button type="button" className="wk-secondary" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>التالي</button></div>}
       </>}
     </div>
-    {detailsReport && <div className="modal-layer"><button className="modal-backdrop" aria-label="إغلاق التفاصيل" onClick={() => setDetailsId(null)} /><section className="field-detail-modal" role="dialog" aria-modal="true" aria-label={`تفاصيل البلاغ ${detailsReport.id}`}><div className="field-detail-head"><div><span className="eyebrow">بلاغ #{detailsReport.id}</span><h2>{categoryName(detailsReport.category)}</h2></div><button className="field-detail-close" onClick={() => setDetailsId(null)} aria-label="إغلاق التفاصيل"><X size={20} /></button></div><StatusPill report={detailsReport} />{detailsReport.field_issue_pending && <p className="field-return-note"><CircleAlert size={16} />الملاحظة بانتظار قرار الموظف: {detailsReport.field_issue_note}</p>}<div className="field-detail-section"><h3>وصف المشكلة</h3><p>{detailsReport.description || 'لا يوجد وصف إضافي.'}</p></div><div className="field-detail-section"><h3>موقع المشكلة</h3><p>{detailsReport.address_text || 'لم يُضف عنوان نصي.'}</p><small dir="ltr">{Number(detailsReport.latitude).toFixed(6)}, {Number(detailsReport.longitude).toFixed(6)}</small><a className="button button-quiet" href={`https://www.google.com/maps/search/?api=1&query=${Number(detailsReport.latitude)},${Number(detailsReport.longitude)}`} target="_blank" rel="noreferrer"><MapPin size={16} />فتح الموقع على الخريطة</a></div><div className="field-detail-section"><h3>مواعيد البلاغ</h3><div className="field-detail-dates"><span>قُدّم البلاغ <strong>{fmtDate(detailsReport.created_at)}</strong></span><span>أُسند إلى جهة العمل <strong>{fmtDate(detailsReport.assigned_at)}</strong></span>{detailsReport.accepted_at && <span>استُلم البلاغ <strong>{fmtDate(detailsReport.accepted_at)}</strong></span>}{detailsReport.work_started_at && <span>بدأ العمل <strong>{fmtDate(detailsReport.work_started_at)}</strong></span>}</div></div>{['new', 'in_progress'].includes(detailsReport.status) && !detailsReport.completion_pending && !detailsReport.field_issue_pending && <button type="button" className="button button-danger-quiet field-issue-button" onClick={() => { setIssueReason(''); setIssueNote(''); setIssueError(''); setIssueId(detailsReport.id); }}><CircleAlert size={17} />الإبلاغ عن مشكلة في البلاغ</button>}</section></div>}
+    {detailsReport && <div className="modal-layer"><button className="modal-backdrop" aria-label="إغلاق التفاصيل" onClick={() => setDetailsId(null)} /><section className="field-detail-modal wk-detail" role="dialog" aria-modal="true" aria-label={`تفاصيل البلاغ ${detailsReport.id}`}>
+      <div className="wk-detail-head"><div><h2>{categoryName(detailsReport.category)}<span className="num">#{detailsReport.id}</span></h2><StatusPill report={detailsReport} /></div><button type="button" className="wk-icon" onClick={() => setDetailsId(null)} aria-label="إغلاق التفاصيل"><X size={20} /></button></div>
+      {imageUrl(detailsReport.image_url) && <button type="button" className="wk-detail-photo" onClick={() => openImage(detailsReport.id)} aria-label="عرض الصورة كاملة"><img src={imageUrl(detailsReport.image_url)} alt={`صورة البلاغ ${detailsReport.id}`} /></button>}
+      {detailsReport.field_issue_pending && <p className="field-return-note"><CircleAlert size={16} />الملاحظة بانتظار قرار الموظف: {detailsReport.field_issue_note}</p>}
+      <div className="wk-detail-block"><h3>وصف المشكلة</h3><p>{detailsReport.description || 'لا يوجد وصف إضافي.'}</p></div>
+      <div className="wk-detail-block"><h3>موقع المشكلة</h3><p>{detailsReport.address_text || 'لم يُضف عنوان نصي.'}</p><small dir="ltr">{Number(detailsReport.latitude).toFixed(6)}, {Number(detailsReport.longitude).toFixed(6)}</small><a className="wk-secondary" href={mapLink(detailsReport)} target="_blank" rel="noopener noreferrer"><Navigation size={17} />فتح الموقع على الخريطة</a></div>
+      <div className="wk-detail-block"><h3>مواعيد البلاغ</h3><dl className="wk-dates"><div><dt>قُدّم البلاغ</dt><dd>{fmtDate(detailsReport.created_at)}</dd></div><div><dt>أُسند إلى جهة العمل</dt><dd>{fmtDate(detailsReport.assigned_at)}</dd></div>{detailsReport.accepted_at && <div><dt>استُلم البلاغ</dt><dd>{fmtDate(detailsReport.accepted_at)}</dd></div>}{detailsReport.work_started_at && <div><dt>بدأ العمل</dt><dd>{fmtDate(detailsReport.work_started_at)}</dd></div>}</dl></div>
+      {['new', 'in_progress'].includes(detailsReport.status) && !detailsReport.completion_pending && !detailsReport.field_issue_pending && <button type="button" className="wk-secondary wk-danger" onClick={() => { setIssueReason(''); setIssueNote(''); setIssueError(''); setIssueId(detailsReport.id); }}><CircleAlert size={17} />الإبلاغ عن مشكلة في البلاغ</button>}
+    </section></div>}
     {issueId && <div className="modal-layer field-issue-layer"><button className="modal-backdrop" aria-label="إلغاء" onClick={() => !busyId && setIssueId(null)} /><section className="confirm-modal field-issue-modal" role="dialog" aria-modal="true" aria-label="الإبلاغ عن مشكلة"><span className="modal-icon danger"><CircleAlert size={25} /></span><h3>الإبلاغ عن مشكلة في البلاغ</h3><p>اختر السبب واكتب ما وجدته في الموقع. سيُحال البلاغ للموظف للمراجعة، ولن يُرفض تلقائيًا.</p><label>سبب الملاحظة<select value={issueReason} onChange={(e) => setIssueReason(e.target.value)}><option value="">اختر السبب</option>{Object.entries(fieldIssueReasons).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label>ملاحظتك للموظف<textarea value={issueNote} maxLength={500} onChange={(e) => setIssueNote(e.target.value)} rows={4} placeholder="اشرح المشكلة التي وجدتها بوضوح" /><small>{issueNote.length}/500</small></label>{issueError && <p className="completion-camera-error" role="alert">{issueError}</p>}<div className="modal-actions"><button className="button button-gold" disabled={Boolean(busyId) || !issueReason || !issueNote.trim()} onClick={submitIssue}>{busyId ? 'جارٍ الإرسال...' : 'إرسال الملاحظة للمراجعة'}</button><button className="button button-quiet" disabled={Boolean(busyId)} onClick={() => setIssueId(null)}>إلغاء</button></div></section></div>}
     {completionId && <div className="modal-layer field-issue-layer"><button className="modal-backdrop" aria-label="إلغاء" onClick={() => !busyId && closeCompletion()} /><section className="confirm-modal field-issue-modal completion-modal" role="dialog" aria-modal="true" aria-label="إبلاغ الموظف بإنجاز العمل"><span className="modal-icon"><CheckCheck size={25} /></span><h3>توثيق إنجاز العمل</h3><p>التقط صورة بعد الإصلاح ليراها الموظف بجانب صورة البلاغ الأصلية. تبقى الحالة «قيد المعالجة» حتى يؤكد الحل.</p>{completionPhoto ? <div className="completion-captured"><img src={completionPreview} alt="صورة الإصلاح قبل الإرسال" /><button type="button" className="button button-quiet" disabled={Boolean(busyId)} onClick={() => { locationRequest.current += 1; setCompletionPhoto(null); setCompletionLocation(null); setCompletionLocationState('idle'); }}><RefreshCw size={16} />إعادة التصوير</button></div> : <CompletionCamera onCapture={captureCompletionPhoto} />}{completionPhoto && <p className="completion-location-state">{completionLocationState === 'checking' ? 'جارٍ تحديد موقع الجهاز...' : completionLocationState === 'ready' ? `سُجل موقع الجهاز بدقة تقريبية ${Math.round(completionLocation.accuracy)} م.` : 'تعذّر تحديد موقع الجهاز؛ سيظهر ذلك للموظف.'}</p>}<label>وصف العمل المنجز (اختياري)<textarea value={completionNote} maxLength={500} onChange={(event) => setCompletionNote(event.target.value)} rows={4} placeholder="اكتب ما أُنجز في الموقع إن أردت" /><small>{completionNote.length}/500</small></label>{completionError && <p className="completion-camera-error" role="alert">{completionError}</p>}<div className="modal-actions"><button className="button button-gold" disabled={Boolean(busyId) || !completionPhoto || completionLocationState === 'checking'} onClick={submitCompletion}>{busyId ? 'جارٍ الإرسال...' : 'إرسال الإنجاز للمراجعة'}</button><button className="button button-quiet" disabled={Boolean(busyId)} onClick={closeCompletion}>إلغاء</button></div></section></div>}
     {confirmId && <div className="modal-layer"><button className="modal-backdrop" aria-label="إلغاء" onClick={() => !busyId && setConfirmId(null)} /><div className="confirm-modal" role="dialog" aria-modal="true" aria-label="تأكيد بدء العمل"><span className="modal-icon"><Clock3 size={25} /></span><h3>هل بدأتم العمل فعليًا؟</h3><p>عند التأكيد ستظهر حالة البلاغ للمواطن «قيد المعالجة» وسيُسجل وقت البدء باسم حسابك.</p><div className="modal-actions"><button className="button button-gold" disabled={Boolean(busyId)} onClick={() => perform(confirmId, 'start')}>{busyId ? 'جارٍ الحفظ...' : 'نعم، بدأنا العمل'}</button><button className="button button-quiet" disabled={Boolean(busyId)} onClick={() => setConfirmId(null)}>إلغاء</button></div></div></div>}
