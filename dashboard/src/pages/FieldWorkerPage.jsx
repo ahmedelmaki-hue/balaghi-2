@@ -1,9 +1,10 @@
 // The field worker's phone-sized page: checks, claims, start, concerns, finished work.
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Check, CheckCheck, CircleAlert, Clock3, Eye, FolderOpen, KeyRound, LogOut, MapPin, Navigation, RefreshCw, ShieldCheck, X,
+  Check, CheckCheck, CircleAlert, Clock3, Eye, FolderOpen, MapPin, Navigation, RefreshCw, ShieldCheck, UserRound, X,
 } from 'lucide-react';
 import { fieldApi, imageUrl } from '../api.js';
+import { AccountMenu } from '../AccountMenu.jsx';
 import CompletionCamera from '../CompletionCamera.jsx';
 import { agencies, fieldIssueReasons, verificationResults, fmtDate, number, categoryName, errorText, Brand, CategoryIcon, StatusPill, EmptyState, LoadingState } from '../shared.jsx';
 
@@ -272,7 +273,7 @@ export function FieldWorkerPage({ user, onLogout, onPassword }) {
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [imageId, issueId, completionId, detailsId, confirmId, busyId]);
-  return <main className="field-layout" dir="rtl"><header className="field-header wk-header"><Brand compact /><div><span className="wk-user">{user.full_name || user.staff_username}</span><button type="button" className="wk-icon" onClick={onPassword} aria-label="تغيير كلمة المرور" title="تغيير كلمة المرور"><KeyRound size={18} /></button><button type="button" className="wk-icon" onClick={onLogout} aria-label="تسجيل الخروج" title="تسجيل الخروج"><LogOut size={18} /></button></div></header>
+  return <main className="field-layout" dir="rtl"><header className="field-header wk-header"><Brand compact /><div><AccountMenu user={user} onPassword={onPassword} onLogout={onLogout} className="wk-account"><span className="wk-avatar"><UserRound size={20} /></span><span className="wk-user">{user.full_name || user.staff_username}</span><span className="sr-only">بيانات الحساب</span></AccountMenu></div></header>
     <div className="field-content rl wk">
       <header className="wk-head">
         <div><span className="eyebrow">{agencies[user.agency] || 'جهة العمل'}</span>

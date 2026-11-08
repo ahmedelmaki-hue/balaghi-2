@@ -990,6 +990,10 @@ button.ov-stat:hover{box-shadow:0 6px 18px rgba(18,50,63,.09);transform:translat
 .wk-header .brand{min-width:0}
 .wk-header>div:last-child{display:flex;align-items:center;gap:8px}
 .wk-user{font-size:14px;font-weight:800;color:#12323f;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wk-account{display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:4px 8px 4px 10px;border:1px solid #e3dccd;border-radius:14px;background:#fff;color:#12323f;font:inherit;cursor:pointer}
+.wk-account:hover{background:#faf7f1}
+.wk-account:focus-visible{outline:3px solid #e5a93c;outline-offset:2px}
+.wk-avatar{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:50%;background:#12323f;color:#e5a93c}
 .wk-icon{display:inline-grid;place-items:center;flex:none;width:44px;height:44px;padding:0;border:1px solid #e3dccd;border-radius:12px;background:#fff;color:#12323f;cursor:pointer}
 .wk-icon:hover{background:#faf7f1}
 .field-content.wk{display:flex;flex-direction:column;gap:16px;padding-top:24px}

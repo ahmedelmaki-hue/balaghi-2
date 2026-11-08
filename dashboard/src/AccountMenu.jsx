@@ -12,7 +12,15 @@ const reviewAbilities = [
   'حسم ملاحظات العمال وتأكيد الحل',
 ];
 
+const workerAbilities = [
+  'استلام بلاغات جهتك وبدء العمل عليها',
+  'إرسال ملاحظة ميدانية عن البلاغ',
+  'توثيق إنجاز العمل بصورة بعد الإصلاح',
+  'الرد على طلبات التحقق قبل الاعتماد',
+];
+
 function abilities(user) {
+  if (user.role === 'field_worker') return workerAbilities;
   if (user.role !== 'admin') return reviewAbilities;
   if (user.is_owner) return [...reviewAbilities, 'إدارة المسؤولين وصلاحياتهم', ...Object.values(permissionNames)];
   return [...reviewAbilities, ...(user.admin_permissions || []).map((key) => permissionNames[key]).filter(Boolean)];
