@@ -1018,6 +1018,45 @@ test('staff pages use the requested filter and offset', async () => {
   });
 });
 
+test('export returns every report the filters select, without citizen data or photos', async () => {
+  const queries = [];
+  let total = 60;
+  const pool = {
+    async query(sql, params) {
+      if (sql.includes('FROM public.profiles WHERE id')) {
+        return { rows: [params[0] === worker.id ? worker : params[0] === citizen.id ? citizen : staff] };
+      }
+      queries.push({ sql, params });
+      if (sql.includes('COUNT(*)')) return { rows: [{ total }] };
+      return { rows: [{ id: '7', category: 'garbage', status: 'resolved' }] };
+    },
+  };
+  const get = (base, path, token = 'staff-token') => jsonRequest(base, path,
+    { headers: { authorization: `Bearer ${token}` } });
+  await withServer({ pool, authClientFactory, storage: fakeStorage() }, async (base) => {
+    const result = await get(base, '/api/reports/staff/export?category=garbage&status=resolved&page=2&limit=1');
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body, { items: [{ id: '7', category: 'garbage', status: 'resolved' }], total: 1 });
+    assert.deepEqual(queries[0].params, ['resolved', 'garbage']);
+    const list = queries[1];
+    assert.deepEqual(list.params, ['resolved', 'garbage'], 'not cut to one page');
+    assert.doesNotMatch(list.sql, /\bLIMIT\b|\bOFFSET\b/);
+    assert.doesNotMatch(list.sql, /reporter_|p\.phone|p\.full_name|image_path|user_id|description/);
+
+    // Filters are checked as on the list, and a huge export is refused rather than cut short.
+    assert.equal((await get(base, '/api/reports/staff/export?acceptance=done')).status, 400);
+    total = 5001;
+    queries.length = 0;
+    assert.deepEqual(await get(base, '/api/reports/staff/export'),
+      { status: 422, body: { error: 'too many reports to export' } });
+    assert.equal(queries.length, 1, 'the rows are never read');
+
+    // Field workers and citizens cannot export.
+    assert.equal((await get(base, '/api/reports/staff/export', 'worker-token')).status, 403);
+    assert.equal((await get(base, '/api/reports/staff/export', 'citizen-token')).status, 403);
+  });
+});
+
 test('staff can find one pending report and review oldest first', async () => {
   const queries = [];
   const pool = {

@@ -4,6 +4,7 @@ import {
   ArrowUpLeft, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Clock3, Copy, Eye, MapPin, Menu, RefreshCw, Search, UserX,
 } from 'lucide-react';
 import { staffApi } from '../api.js';
+import { ReportExport } from '../ReportExport.jsx';
 import { categories, agencyNames, fmtDate, number, reportSearchId, categoryName, errorText, CategoryIcon, StatusPill, AcceptanceState, VerificationState, ReportThumbnail, EmptyState, LoadingState } from '../shared.jsx';
 
 const relativeTime = new Intl.RelativeTimeFormat('ar-LY', { numeric: 'auto' });
@@ -231,6 +232,15 @@ export function ReportsPage({ onOpen, refreshKey, onMenu }) {
   const activeFilters = ['acceptance', 'category', 'date', 'report_id'].filter((key) => filters[key]).length;
   const start = result?.total ? (result.page - 1) * 25 + 1 : 0;
   const end = result?.total ? Math.min(result.page * 25, result.total) : 0;
+  const stageFilter = (STAGES.find((item) => item.key === filters.stage) || STAGES[0]);
+  const { stage: _stage, page: _page, ...exportFilters } = filters;
+  const exportSummary = [
+    filters.stage && stageFilter.label,
+    filters.category && categoryName(filters.category),
+    filters.acceptance && 'لم يُستلم بعد',
+    filters.date && `أُرسلت في ${filters.date}`,
+    filters.report_id && `رقم البلاغ ${filters.report_id}`,
+  ].filter(Boolean).join(' · ') || 'كل البلاغات';
 
   return <div className="rl">
     <header className="pr-head">
@@ -240,9 +250,12 @@ export function ReportsPage({ onOpen, refreshKey, onMenu }) {
           <h1>جميع البلاغات{stats && <span className="pr-count num">{number(stats.total)}</span>}</h1>
           <p>كل بلاغ أرسله المواطنون، بحالته الحالية ومن استلمه.</p></div>
       </div>
-      <button type="button" className="pr-refresh" onClick={() => setTick((value) => value + 1)}>
-        <RefreshCw size={16} />{loadedAt ? <>تحديث · <span className="num">{clockTime.format(loadedAt)}</span></> : 'تحديث'}
-      </button>
+      <div className="ac-head-actions">
+        <ReportExport query={{ ...exportFilters, ...stageFilter.filter }} summary={exportSummary} total={result?.total} />
+        <button type="button" className="pr-refresh" onClick={() => setTick((value) => value + 1)}>
+          <RefreshCw size={16} />{loadedAt ? <>تحديث · <span className="num">{clockTime.format(loadedAt)}</span></> : 'تحديث'}
+        </button>
+      </div>
     </header>
 
     <section className="rl-filters" aria-label="تصفية البلاغات">

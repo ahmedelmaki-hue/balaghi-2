@@ -18,6 +18,7 @@ const NEXT_STATUS = {
   resolved: [],
   rejected: [],
 };
+const EXPORT_LIMIT = 5000;
 const REPORT_COLUMNS = `r.id, r.category, r.description, r.image_path, r.latitude,
   r.longitude, r.address_text, r.status, r.approved_at, r.assigned_agency,
   r.created_at, r.updated_at`;
@@ -195,17 +196,16 @@ function createReportsRouter({ pool, auth, storage, geocoder = null }) {
       total_pages: Math.ceil(total / limit) });
   }));
 
-  router.get('/staff', auth('staff'), asyncRoute(async (req, res) => {
-    const { page, limit, offset } = pagination(req.query);
-    const status = optionalChoice(req.query.status, STATUSES, 'status');
-    const category = optionalChoice(req.query.category, CATEGORIES, 'category');
-    const date = validDate(req.query.date);
-    const review = optionalChoice(req.query.review, ['pending', 'approved', 'rejected'], 'review');
-    const fieldReview = optionalChoice(req.query.field_review, ['pending'], 'field_review');
-    const completion = optionalChoice(req.query.completion, ['pending'], 'completion');
-    const acceptance = optionalChoice(req.query.acceptance, ['pending'], 'acceptance');
-    const sort = optionalChoice(req.query.sort, ['newest', 'oldest'], 'sort') || 'newest';
-    const searchedId = req.query.report_id === undefined ? null : reportId(req.query.report_id);
+  function staffListFilters(query) {
+    const status = optionalChoice(query.status, STATUSES, 'status');
+    const category = optionalChoice(query.category, CATEGORIES, 'category');
+    const date = validDate(query.date);
+    const review = optionalChoice(query.review, ['pending', 'approved', 'rejected'], 'review');
+    const fieldReview = optionalChoice(query.field_review, ['pending'], 'field_review');
+    const completion = optionalChoice(query.completion, ['pending'], 'completion');
+    const acceptance = optionalChoice(query.acceptance, ['pending'], 'acceptance');
+    const sort = optionalChoice(query.sort, ['newest', 'oldest'], 'sort') || 'newest';
+    const searchedId = query.report_id === undefined ? null : reportId(query.report_id);
     const params = [];
     const conditions = [];
     if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
@@ -233,6 +233,31 @@ function createReportsRouter({ pool, auth, storage, geocoder = null }) {
     }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const direction = sort === 'oldest' ? 'ASC' : 'DESC';
+    return { params, where, sortColumn, direction };
+  }
+
+  // For an Excel file or a printed report. Citizens' names and phones and the photos
+  // stay out on purpose: exported files travel beyond the dashboard's access checks.
+  router.get('/staff/export', auth('staff'), asyncRoute(async (req, res) => {
+    const { params, where, sortColumn, direction } = staffListFilters(req.query);
+    const count = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM public.reports r ${where}`, params
+    );
+    if (count.rows[0].total > EXPORT_LIMIT) throw new HttpError(422, 'too many reports to export');
+    const { rows } = await pool.query(
+      `SELECT r.id, r.category, r.address_text, r.status, r.approved_at, r.assigned_agency,
+         r.created_at, r.work_started_at, worker.full_name AS assigned_worker_name
+       FROM public.reports r
+       LEFT JOIN public.profiles worker ON worker.id = r.assigned_worker_id
+       ${where} ORDER BY ${sortColumn} ${direction}, r.id ${direction}`,
+      params
+    );
+    res.json({ items: rows, total: rows.length });
+  }));
+
+  router.get('/staff', auth('staff'), asyncRoute(async (req, res) => {
+    const { page, limit, offset } = pagination(req.query);
+    const { params, where, sortColumn, direction } = staffListFilters(req.query);
     const count = await pool.query(
       `SELECT COUNT(*)::int AS total FROM public.reports r ${where}`, params
     );

@@ -1095,3 +1095,69 @@ div.wk-photo{cursor:default}
   .wk-head .pr-refresh .num{display:none}
 }
 @media(prefers-reduced-motion:reduce){.field-detail-modal.wk-detail{animation:none}}
+
+/* Report export — the menu, the print preview, and what reaches the paper. */
+.px-export{position:relative}
+.px-menu{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:270px;max-width:calc(100vw - 32px);padding:6px;border:1px solid #e3dccd;border-radius:14px;background:#fff;box-shadow:0 14px 34px rgba(18,50,63,.16)}
+.px-menu p{margin:0;padding:8px 10px;font-size:13px;color:#5b6a6f}
+.px-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:6px 10px;border:0;border-radius:10px;background:transparent;color:#12323f;font:inherit;text-align:right;cursor:pointer}
+.px-menu button:hover{background:#faf7f1}
+.px-menu button:focus-visible{outline:3px solid #e5a93c;outline-offset:-3px}
+.px-menu button svg{flex:none;color:#be820e}
+.px-menu button span{display:flex;flex-direction:column}
+.px-menu strong{font-size:14px;font-weight:800}
+.px-menu small{font-size:12px;color:#5b6a6f}
+.px-error{display:flex;align-items:center;gap:6px;margin:6px 0 0;font-size:13px;font-weight:600;color:#a5281f}
+.px-layer{position:fixed;inset:0;z-index:1200;overflow:auto;background:#e9e5dc;color:#12323f}
+.px-toolbar{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:#12323f;color:#fff}
+.px-toolbar strong{font-size:15px}
+.px-toolbar>div{display:flex;align-items:center;gap:8px}
+.px-print{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 14px;border:0;border-radius:10px;background:#e5a93c;color:#12323f;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
+.px-close{display:inline-grid;place-items:center;width:44px;height:44px;border:1px solid rgba(255,255,255,.3);border-radius:10px;background:transparent;color:#fff;cursor:pointer}
+.px-sheet{max-width:1040px;margin:20px auto 40px;padding:32px;background:#fff;box-shadow:0 8px 28px rgba(18,50,63,.12)}
+.px-sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:14px;border-bottom:2px solid #12323f}
+.px-sheet-head>div{display:flex;flex-direction:column;gap:2px;font-size:13px;color:#5b6a6f}
+.px-brand{display:inline-flex;align-items:baseline;gap:2px;font-size:24px;font-weight:800;line-height:1.2;color:#12323f}
+.px-brand i{width:6px;height:6px;border-radius:50%;background:#e5a93c}
+.px-issued{text-align:left}
+.px-issued strong{font-size:13px;color:#12323f}
+.px-sheet h1{margin:18px 0 10px;font-size:22px;font-weight:800;color:#12323f}
+.px-facts{display:flex;flex-wrap:wrap;gap:8px 32px;margin:0 0 16px}
+.px-facts div{display:flex;gap:6px;font-size:14px}
+.px-facts dt{color:#5b6a6f}
+.px-facts dd{margin:0;font-weight:700}
+.px-table-wrap{overflow-x:auto}
+.px-table{width:100%;min-width:760px;border-collapse:collapse;font-size:13px;text-align:right}
+.px-table th{padding:8px 10px;border-bottom:2px solid #12323f;background:#faf8f3;font-weight:800;white-space:nowrap}
+.px-table td{padding:8px 10px;border-bottom:1px solid #e8e2d6;vertical-align:top}
+.px-table td:first-child{font-weight:800;font-variant-numeric:tabular-nums}
+.st-print{white-space:nowrap}
+
+@media(max-width:720px){
+  .px-sheet{margin:0;padding:18px 14px;box-shadow:none}
+  .px-toolbar strong{display:none}
+  .px-print{flex:1;justify-content:center}
+  .px-toolbar>div{flex:1}
+  .px-menu{left:auto;right:0}
+}
+
+@page wide{size:A4 landscape;margin:12mm}
+@page{size:A4;margin:12mm}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.px-open #root{display:none}
+  .px-layer{position:static;overflow:visible;background:#fff}
+  .px-toolbar{display:none}
+  .px-sheet{page:wide;max-width:none;margin:0;padding:0;box-shadow:none}
+  .px-table-wrap{overflow:visible}
+  .px-table{min-width:0;font-size:11px}
+  .px-table thead{display:table-header-group}
+  .px-table tr{break-inside:avoid}
+  /* The statistics page prints on its own, without the dashboard around it. */
+  body:not(.px-open) .sidebar,body:not(.px-open) .top-strip,body:not(.px-open) .main-footer,body:not(.px-open) .mobile-menu,body:not(.px-open) .pr-refresh,body:not(.px-open) .px-export{display:none!important}
+  html,body,.main-area,.field-layout{background:#fff!important}
+  body:not(.px-open) .st button{display:none!important}
+  body:not(.px-open) .main-area{margin:0!important;width:100%!important}
+  body:not(.px-open) .page-container{padding:0!important;max-width:none!important}
+  .st section,.st article,.st [class*="card"]{break-inside:avoid}
+}

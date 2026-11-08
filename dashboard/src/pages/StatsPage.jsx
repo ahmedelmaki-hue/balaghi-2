@@ -3,7 +3,7 @@
 // totals come from /stats/overview and the rest from /stats/insights.
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Building2, CalendarDays, CircleAlert, Clock3, Gauge, Inbox, Menu, RefreshCw, Table2, TrendingDown, TrendingUp,
+  Building2, CalendarDays, CircleAlert, Clock3, Gauge, Inbox, Menu, Printer, RefreshCw, Table2, TrendingDown, TrendingUp,
 } from 'lucide-react';
 import { staffApi } from '../api.js';
 import { categories, agencyNames, categoryAgency, number, errorText, CategoryIcon, EmptyState, LoadingState } from '../shared.jsx';
@@ -146,9 +146,12 @@ export function StatsPage({ refreshKey, onMenu }) {
       <div><span className="eyebrow">قراءة البيانات</span><h1>الإحصاءات</h1>
         <p>من بيانات النظام الفعلية، لحظة فتح الصفحة.</p></div>
     </div>
-    <button type="button" className="pr-refresh" onClick={() => setTick((n) => n + 1)}>
-      <RefreshCw size={16} />{loadedAt ? <>تحديث · <span className="num">{clockTime.format(loadedAt)}</span></> : 'تحديث'}
-    </button>
+    <div className="ac-head-actions">
+      <button type="button" className="pr-refresh st-print" onClick={() => window.print()}><Printer size={16} />طباعة</button>
+      <button type="button" className="pr-refresh" onClick={() => setTick((n) => n + 1)}>
+        <RefreshCw size={16} />{loadedAt ? <>تحديث · <span className="num">{clockTime.format(loadedAt)}</span></> : 'تحديث'}
+      </button>
+    </div>
   </header>;
   if (!data) return <div className="st">{head}<LoadingState /></div>;
 

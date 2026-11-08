@@ -84,6 +84,7 @@ export const auditActions = {
 };
 const adminMessages = {
   'username already exists': 'اسم المستخدم مستخدم بالفعل. اختر اسمًا آخر.',
+  'too many reports to export': 'عدد البلاغات كبير جدًا للتصدير. ضيّق الفلاتر، مثل التاريخ أو التصنيف، ثم حاول مجددًا.',
   'contact_phone must be a Libyan mobile number': 'اكتب رقم جوال ليبي صحيحًا للتواصل، مثل 0912345678.',
   'cannot change own role': 'لا يمكنك تغيير دورك بنفسك.',
   'cannot change own account status': 'لا يمكنك تعطيل حسابك بنفسك.',
@@ -118,6 +119,9 @@ export const reportSearchId = (value) => {
 };
 export const categoryName = (value) => categories[value]?.label || 'تصنيف غير معروف';
 const statusName = (value) => statuses[value]?.label || '—';
+// The status as staff read it; a report awaiting review is still `new` in the database.
+export const reportStatusName = (report) => (report.status === 'rejected' ? 'مرفوض'
+  : !report.approved_at ? 'بانتظار المراجعة' : statusName(report.status));
 export const errorText = (error) => {
   if (error instanceof ApiError) {
     if (adminMessages[error.message]) return adminMessages[error.message];
@@ -151,9 +155,7 @@ export function CategoryIcon({ category, size = 19 }) {
 export function StatusPill({ report }) {
   const style = report.status === 'rejected' ? 'rejected'
     : !report.approved_at ? 'pending' : statuses[report.status]?.className || 'pending';
-  const label = report.status === 'rejected' ? 'مرفوض'
-    : !report.approved_at ? 'بانتظار المراجعة' : statusName(report.status);
-  return <span className={`status-pill ${style}`}><i />{label}</span>;
+  return <span className={`status-pill ${style}`}><i />{reportStatusName(report)}</span>;
 }
 
 export function AcceptanceState({ report }) {
