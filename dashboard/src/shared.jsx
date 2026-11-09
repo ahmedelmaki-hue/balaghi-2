@@ -1,7 +1,7 @@
 // Labels, permission rules, formatting helpers and small components every screen shares.
 import React, { useState } from 'react';
 import {
-  BarChart3, CheckCheck, ChevronLeft, ChevronRight, CircleAlert, Construction, Contact, Droplets, FileClock, History, LayoutDashboard, MapPinned, Menu, RefreshCw, ShieldCheck, Trash2, Users,
+  BarChart3, CheckCheck, ChevronLeft, ChevronRight, CircleAlert, Construction, Contact, Droplets, FileClock, History, LayoutDashboard, MapPinned, Menu, RefreshCw, ScanEye, ShieldCheck, Trash2, Users,
 } from 'lucide-react';
 import { ApiError, imageUrl } from './api.js';
 
@@ -84,7 +84,9 @@ export const auditActions = {
 };
 const adminMessages = {
   'username already exists': 'اسم المستخدم مستخدم بالفعل. اختر اسمًا آخر.',
-  'too many reports to export': 'عدد البلاغات كبير جدًا للتصدير. ضيّق الفلاتر، مثل التاريخ أو التصنيف، ثم حاول مجددًا.',
+  'photo check failed': 'تعذّر تحليل الصورة الآن. حاول مرة أخرى بعد قليل.',
+  'photo check unavailable': 'تحليل الصور غير مفعّل على الخادم حاليًا.',
+  'too many reports to export':'عدد البلاغات كبير جدًا للتصدير. ضيّق الفلاتر، مثل التاريخ أو التصنيف، ثم حاول مجددًا.',
   'contact_phone must be a Libyan mobile number': 'اكتب رقم جوال ليبي صحيحًا للتواصل، مثل 0912345678.',
   'cannot change own role': 'لا يمكنك تغيير دورك بنفسك.',
   'cannot change own account status': 'لا يمكنك تعطيل حسابك بنفسك.',
@@ -164,6 +166,27 @@ export function AcceptanceState({ report }) {
   return <span className={`acceptance-state ${report.accepted_at ? 'accepted' : 'waiting'}`}>
     {report.accepted_at ? `استلمه ${worker || 'العامل الميداني'}` : 'بانتظار الاستلام'}
   </span>;
+}
+
+// The automatic photo check against the category the citizen chose; null before it ran.
+const photoConfidence = { high: 'ثقة عالية', medium: 'ثقة متوسطة', low: 'ثقة منخفضة' };
+export function photoCheck(report) {
+  if (!report?.ai_category) return null;
+  const confidence = photoConfidence[report.ai_confidence] || '';
+  if (report.ai_category === 'other') return { kind: 'unclear', confidence };
+  if (report.ai_category === report.category) return { kind: 'match', confidence };
+  return { kind: 'mismatch', suggested: report.ai_category, confidence };
+}
+
+// A warning line in the review queue, only when the photo disagrees with the report; a match
+// shows in the report's details instead. The icon marks it as automatic; the words carry the meaning.
+export const photoWarning = (report) => ['mismatch', 'unclear'].includes(photoCheck(report)?.kind);
+export function PhotoCheckChip({ report }) {
+  if (!photoWarning(report)) return null;
+  const check = photoCheck(report);
+  const text = check.kind === 'mismatch' ? <>الصورة تبدو «{categoryName(check.suggested)}»</> : 'لا تظهر مشكلة واضحة في الصورة';
+  return <span className={`pc-chip is-${check.kind}`} title={report.ai_reason || undefined}>
+    <ScanEye size={13} aria-hidden="true" /><span className="sr-only">فحص آلي: </span><span>{text}</span></span>;
 }
 
 export function VerificationState({ report }) {

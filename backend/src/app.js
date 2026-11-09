@@ -23,7 +23,7 @@ function securityHeaders(req, res, next) {
 
 function createApp({
   pool, authClientFactory, storage, authAdmin, staffEmailDomain = 'balaghi.local',
-  corsOrigins = [], trustProxy = false, geocoder = null, smsHook = null,
+  corsOrigins = [], trustProxy = false, geocoder = null, smsHook = null, photoChecker = null,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -45,7 +45,7 @@ function createApp({
   }));
   if (smsHook) app.use('/api/auth/sms-hook', createSmsHookRouter(smsHook));
   app.use('/api/auth', createAuthRouter({ pool, authClientFactory, authAdmin, auth, limit }));
-  app.use('/api/reports', createReportsRouter({ pool, auth, storage, geocoder }));
+  app.use('/api/reports', createReportsRouter({ pool, auth, storage, geocoder, photoChecker }));
   app.use('/api/stats', createStatsRouter({ pool, auth }));
   app.use('/api/admin', createAdminRouter({ pool, auth, authAdmin, staffEmailDomain }));
   app.use((req, res, next) => next(new HttpError(404, 'not found')));

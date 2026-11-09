@@ -33,6 +33,7 @@
     "test:integration": "node --require ./scripts/local-env.js --test integration/lifecycle.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@supabase/supabase-js": "^2.117.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

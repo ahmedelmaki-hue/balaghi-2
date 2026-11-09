@@ -37,6 +37,12 @@ function loadConfig(env = process.env) {
       url: env.GEOCODER_URL || undefined,
       userAgent: env.GEOCODER_USER_AGENT || undefined,
     },
+    // The automatic photo check with Claude; without a key, reports carry no check.
+    // PHOTO_CHECK=off turns it off while keeping the key.
+    photoCheck: env.ANTHROPIC_API_KEY && env.PHOTO_CHECK !== 'off' ? {
+      apiKey: env.ANTHROPIC_API_KEY,
+      model: env.PHOTO_CHECK_MODEL || undefined,
+    } : null,
   };
 
   const missing = [

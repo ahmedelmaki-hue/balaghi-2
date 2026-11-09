@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { staffApi } from '../api.js';
 import { ReportExport } from '../ReportExport.jsx';
-import { categories, agencyNames, fmtDate, number, reportSearchId, categoryName, errorText, CategoryIcon, StatusPill, AcceptanceState, VerificationState, ReportThumbnail, EmptyState, LoadingState } from '../shared.jsx';
+import { categories, agencyNames, fmtDate, number, reportSearchId, categoryName, errorText, photoWarning, CategoryIcon, StatusPill, AcceptanceState, VerificationState, PhotoCheckChip, ReportThumbnail, EmptyState, LoadingState } from '../shared.jsx';
 
 const relativeTime = new Intl.RelativeTimeFormat('ar-LY', { numeric: 'auto' });
 const clockTime = new Intl.DateTimeFormat('ar-LY', { timeStyle: 'short' });
@@ -158,7 +158,8 @@ export function PendingReviewPage({ fieldReviewQueue = false, completionQueue = 
               </div>
               <p className={`pr-desc ${report.description ? '' : 'is-empty'}`}>{report.description || 'لم يُضف المواطن وصفًا.'}</p>
               <p className="pr-place"><MapPin size={14} />{report.address_text || 'الموقع محدد على الخريطة'}</p>
-              {(twin || report.verification_requested_at) && <div className="pr-flags">
+              {(twin || report.verification_requested_at || (reviewQueue && photoWarning(report))) && <div className="pr-flags">
+                {reviewQueue && <PhotoCheckChip report={report} />}
                 <VerificationState report={report} />
                 {twin && <span className="pr-twin"><Copy size={13} /><span>قد يكون مكررًا: بلاغ <bdi className="num">#{twin.id}</bdi> على بعد <bdi className="num">{number(twin.distance_m)}</bdi> م</span></span>}
               </div>}

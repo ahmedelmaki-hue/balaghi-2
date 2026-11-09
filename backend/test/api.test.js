@@ -1434,6 +1434,94 @@ test('a new report gets its street name after the response is sent', async () =>
   });
 });
 
+test('a new report photo is checked after the response is sent, and a failed check changes nothing', async () => {
+  const reports = citizenReportsPool();
+  const checkWrites = [];
+  const query = async (sql, params) => {
+    if (sql.includes('SET ai_category')) { checkWrites.push(params); return { rows: [], rowCount: 1 }; }
+    return reports.query(sql, params);
+  };
+  const pool = { query, async connect() { return { query, release() {} }; } };
+  const photos = [];
+  let fail = false;
+  const photoChecker = { async classify(image) {
+    photos.push(image);
+    if (fail) throw new Error('service down');
+    return { category: 'garbage', confidence: 'high', reason: 'أكياس قمامة على الرصيف.' };
+  } };
+
+  await withServer({ pool, authClientFactory, storage: fakeStorage(), photoChecker }, async (base) => {
+    const created = await sendReport(base, '77777777-7777-4777-8777-777777777777');
+    assert.equal(created.status, 201);
+    assert.equal(created.body.ai_category, undefined, 'the citizen never sees the check');
+    for (let i = 0; i < 50 && !checkWrites.length; i += 1) await new Promise((done) => setTimeout(done, 10));
+    assert.ok(Buffer.isBuffer(photos[0]), 'the saved photo is checked, without downloading it again');
+    assert.deepEqual(checkWrites[0], ['1', 'garbage', 'high', 'أكياس قمامة على الرصيف.', null]);
+
+    fail = true;
+    assert.equal((await sendReport(base, '88888888-8888-4888-8888-888888888888')).status, 201);
+    for (let i = 0; i < 50 && photos.length < 2; i += 1) await new Promise((done) => setTimeout(done, 10));
+    await new Promise((done) => setTimeout(done, 20));
+    assert.equal(checkWrites.length, 1);
+  });
+});
+
+test('staff can run the photo check again only while a report awaits review', async () => {
+  const report = { id: '9', image_path: 'user/9.jpg', status: 'new', approved_at: null, ai_checked_at: null };
+  const writes = [];
+  const pool = {
+    async query(sql, params) {
+      if (sql.includes('FROM public.profiles WHERE id')) return { rows: [params[0] === staffId ? staff : citizen] };
+      if (sql.includes('SELECT id, image_path, status')) return { rows: params[0] === '9' ? [report] : [] };
+      if (sql.includes('SET ai_category')) {
+        writes.push(params);
+        Object.assign(report, { ai_checked_at: new Date(), ai_category: params[1] });
+        return { rowCount: 1 };
+      }
+      if (sql.includes('AS ai_checked_by_name')) {
+        return { rows: [{ ai_category: report.ai_category, ai_checked_at: report.ai_checked_at, ai_checked_by_name: 'موظف' }] };
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    },
+  };
+  const downloads = [];
+  const storage = { ...fakeStorage(), async download(path) { downloads.push(path); return Buffer.from('photo'); } };
+  let fail = true;
+  const checks = [];
+  const photoChecker = { async classify(image) {
+    checks.push(image.toString());
+    if (fail) throw new Error('service down');
+    return { category: 'water_leak', confidence: 'medium', reason: 'مياه تتجمع قرب أنبوب.' };
+  } };
+  const run = (base, id, token = 'staff-token') => jsonRequest(base, `/api/reports/${id}/photo-check`,
+    { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+
+  await withServer({ pool, authClientFactory, storage }, async (base) => {
+    assert.equal((await run(base, '9')).status, 503, 'without a key the check is unavailable');
+  });
+  await withServer({ pool, authClientFactory, storage, photoChecker }, async (base) => {
+    assert.equal((await run(base, '9', 'citizen-token')).status, 403);
+    assert.equal((await run(base, '404')).status, 404);
+    const failed = await run(base, '9');
+    assert.equal(failed.status, 502);
+    assert.equal(failed.body.error, 'photo check failed');
+    assert.equal(writes.length, 0);
+
+    fail = false;
+    const done = await run(base, '9');
+    assert.equal(done.status, 200);
+    assert.equal(done.body.ai_category, 'water_leak');
+    assert.deepEqual(downloads, ['user/9.jpg', 'user/9.jpg']);
+    assert.deepEqual(writes[0], ['9', 'water_leak', 'medium', 'مياه تتجمع قرب أنبوب.', staffId]);
+
+    assert.equal((await run(base, '9')).status, 200);
+    assert.equal(checks.length, 2, 'a saved result is returned, not paid for again');
+
+    report.approved_at = new Date();
+    assert.equal((await run(base, '9')).status, 409);
+  });
+});
+
 test('the statistics insights come back in one request, for staff only', async () => {
   const pool = {
     async query(sql, params) {

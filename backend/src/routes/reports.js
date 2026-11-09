@@ -5,6 +5,7 @@ const { prepareImage, MAX_IMAGE_BYTES } = require('../storage');
 const { isPointInTripoliCenter } = require('../report_area');
 const { optionalChoice, positiveInteger, pagination } = require('../params');
 const { fillReportAddress } = require('../geocode');
+const { savePhotoCheck, photoCheckError } = require('../photo_check');
 
 const CATEGORIES = ['pothole', 'water_leak', 'garbage'];
 const AGENCY_BY_CATEGORY = {
@@ -25,6 +26,9 @@ const REPORT_COLUMNS = `r.id, r.category, r.description, r.image_path, r.latitud
 const PUBLIC_COLUMNS = `r.id, r.category, r.description, r.image_path, r.latitude,
   r.longitude, r.address_text, r.status, r.created_at`;
 const MARKER_COLUMNS = 'r.id, r.category, r.latitude, r.longitude, r.status, r.created_at';
+// The automatic photo check, for staff only; citizens never see it.
+const PHOTO_CHECK_COLUMNS = `r.ai_category, r.ai_confidence, r.ai_reason, r.ai_checked_at,
+  (SELECT c.full_name FROM public.profiles c WHERE c.id = r.ai_checked_by) AS ai_checked_by_name`;
 const REJECTION_REASON = `(SELECT h.change_reason FROM public.status_history h
   WHERE h.report_id = r.id AND h.new_status = 'rejected'
   ORDER BY h.changed_at DESC, h.id DESC LIMIT 1) AS rejection_reason`;
@@ -126,8 +130,17 @@ function mapMarker(row) {
   return { id, category, latitude, longitude, status, created_at };
 }
 
-function createReportsRouter({ pool, auth, storage, geocoder = null }) {
+function createReportsRouter({ pool, auth, storage, geocoder = null, photoChecker = null }) {
   const router = express.Router();
+  // The photo check also runs after the response is sent; a failure leaves the report
+  // without one, and staff can ask for it again.
+  const checkPhoto = (id, image) => {
+    if (!photoChecker) return;
+    photoChecker.classify(image)
+      .then((result) => savePhotoCheck(pool, id, result))
+      .then((saved) => console.log(`Photo check for report ${id}: ${saved ? 'saved' : 'already checked'}`))
+      .catch((error) => console.warn(`Photo check for report ${id} failed: ${photoCheckError(error)}`));
+  };
   // The street name is looked up after the response is sent; when the lookup
   // fails or finds nothing, screens keep showing the coordinates.
   const lookUpAddress = (id) => {
@@ -264,7 +277,7 @@ function createReportsRouter({ pool, auth, storage, geocoder = null }) {
     const listParams = [...params, limit, offset];
     const { rows } = await pool.query(
       `SELECT ${REPORT_COLUMNS}, r.user_id, p.full_name AS reporter_name,
-         p.phone AS reporter_phone, ${REJECTION_REASON},
+         p.phone AS reporter_phone, ${REJECTION_REASON}, ${PHOTO_CHECK_COLUMNS},
          (SELECT fi.raised_at FROM public.field_issue_reviews fi
           WHERE fi.report_id = r.id AND fi.decision IS NULL) AS field_issue_raised_at,
          (SELECT wc.submitted_at FROM public.work_completion_reviews wc
@@ -420,7 +433,8 @@ function createReportsRouter({ pool, auth, storage, geocoder = null }) {
          worker.is_active AS assigned_worker_active,
          worker.contact_phone AS assigned_worker_contact_phone,
          approver.full_name AS approved_by_name,
-         approver.staff_username AS approved_by_username, ${REJECTION_REASON}
+         approver.staff_username AS approved_by_username, ${REJECTION_REASON},
+         ${PHOTO_CHECK_COLUMNS}
        FROM public.reports r JOIN public.profiles p ON p.id = r.user_id
        LEFT JOIN public.profiles worker ON worker.id = r.assigned_worker_id
        LEFT JOIN public.profiles approver ON approver.id = r.approved_by
@@ -569,6 +583,35 @@ function createReportsRouter({ pool, auth, storage, geocoder = null }) {
     }
     res.status(201).json((await storage.withSignedImages([created]))[0]);
     if (!created.address_text) lookUpAddress(created.id);
+    checkPhoto(created.id, imageBuffer);
+  }));
+
+  // Runs the photo check again when the automatic one left no result, for a report
+  // still awaiting review. Answers with the result, whoever saved it first.
+  router.post('/:id/photo-check', auth('staff'), asyncRoute(async (req, res) => {
+    const id = reportId(req.params.id);
+    if (!photoChecker) throw new HttpError(503, 'photo check unavailable');
+    const current = await pool.query(
+      `SELECT id, image_path, status, approved_at, ai_checked_at FROM public.reports WHERE id = $1`, [id]
+    );
+    const report = current.rows[0];
+    if (!report) throw new HttpError(404, 'not found');
+    if (report.status !== 'new' || report.approved_at) throw new HttpError(409, 'report is not awaiting approval');
+    if (!report.ai_checked_at) {
+      let result;
+      try {
+        result = await photoChecker.classify(await storage.download(report.image_path));
+      } catch (error) {
+        if (error instanceof HttpError) throw error;
+        console.warn(`Photo check for report ${id} failed: ${photoCheckError(error)}`);
+        throw new HttpError(502, 'photo check failed');
+      }
+      await savePhotoCheck(pool, id, result, req.user.id);
+    }
+    const { rows } = await pool.query(
+      `SELECT ${PHOTO_CHECK_COLUMNS} FROM public.reports r WHERE r.id = $1`, [id]
+    );
+    res.json(rows[0]);
   }));
 
   router.patch('/:id/verification/request', auth('staff'), asyncRoute(async (req, res) => {

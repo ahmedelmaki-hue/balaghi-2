@@ -89,9 +89,22 @@ CREATE TABLE public.reports (
   assigned_at TIMESTAMPTZ,
   accepted_at TIMESTAMPTZ,
   work_started_at TIMESTAMPTZ,
+  -- Automatic photo check (a suggestion for staff): what the photo shows.
+  ai_category TEXT,
+  ai_confidence TEXT,
+  ai_reason VARCHAR(500),
+  ai_checked_at TIMESTAMPTZ,
+  ai_checked_by UUID REFERENCES public.profiles(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT approval_requires_time CHECK (approved_by IS NULL OR approved_at IS NOT NULL),
+  CONSTRAINT reports_photo_check_check CHECK (
+    (ai_category IS NULL AND ai_confidence IS NULL AND ai_reason IS NULL
+      AND ai_checked_at IS NULL AND ai_checked_by IS NULL)
+    OR (ai_category IN ('pothole', 'water_leak', 'garbage', 'other')
+      AND ai_confidence IN ('high', 'medium', 'low')
+      AND ai_reason IS NOT NULL AND ai_checked_at IS NOT NULL)
+  ),
   CONSTRAINT reports_agency_check CHECK (
     assigned_agency IS NULL OR assigned_agency IN
       ('public_services', 'water_sewer', 'roads_maintenance')

@@ -130,6 +130,7 @@ export const staffApi = {
   exportReports: (query) => api('/reports/staff/export', { query }),
   report: (id) => api(`/reports/${encodeURIComponent(id)}/staff`),
   nearby: (id) => api(`/reports/${encodeURIComponent(id)}/nearby`),
+  photoCheck: (id) => api(`/reports/${encodeURIComponent(id)}/photo-check`, { method: 'POST' }),
   approve: (id) => api(`/reports/${encodeURIComponent(id)}/approve`, { method: 'PATCH' }),
   correctCategory: (id, category) => api(`/reports/${encodeURIComponent(id)}/category`, {
     method: 'PATCH', body: { category },

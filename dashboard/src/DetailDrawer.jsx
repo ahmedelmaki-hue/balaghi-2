@@ -2,11 +2,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
-  Check, CheckCheck, CircleAlert, Clock3, Eye, Image as ImageIcon, MapPin, MapPinned, RefreshCw, RotateCcw, ShieldCheck, X,
+  Check, CheckCheck, CircleAlert, Clock3, Eye, Image as ImageIcon, MapPin, MapPinned, RefreshCw, RotateCcw, ScanEye, ShieldCheck, X,
 } from 'lucide-react';
 import { imageUrl, staffApi } from './api.js';
 import { buildReportTimeline } from './reportTimeline.js';
-import { categories, agencies, agencyTeams, categoryAgency, fieldIssueReasons, verificationResults, fmtDate, number, categoryName, errorText, localPhone, StatusPill, LoadingState } from './shared.jsx';
+import { categories, agencies, agencyTeams, categoryAgency, fieldIssueReasons, verificationResults, fmtDate, number, categoryName, errorText, localPhone, photoCheck, StatusPill, LoadingState } from './shared.jsx';
 
 function LocationCorrectionPicker({ latitude, longitude, onChange }) {
   const container = useRef(null);
@@ -55,12 +55,14 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast, onOpen }) {
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [nearby, setNearby] = useState(null);
+  const [analysing, setAnalysing] = useState(false);
+  const [analysisError, setAnalysisError] = useState('');
   const detailMap = useRef(null);
   const nearbyLayer = useRef(null);
   const mapContainer = useRef(null);
   useEffect(() => {
     let active = true;
-    setData(null); setError('');
+    setData(null); setError(''); setAnalysisError('');
     staffApi.report(id).then((result) => { if (active) setData(result); })
       .catch((cause) => { if (active) setError(errorText(cause)); });
     return () => { active = false; };
@@ -117,6 +119,19 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast, onOpen }) {
   const verificationNeedsLocation = latestVerification?.result === 'wrong_location' &&
     !latestVerification.corrected_at;
   const pending = report?.status === 'new' && !report?.approved_at;
+  const check = pending ? photoCheck(report) : null;
+  // The automatic check runs a few seconds after a report arrives; until then, say so.
+  const checkRunning = pending && !check && Date.now() - new Date(report.created_at).getTime() < 60_000;
+  // Runs the photo check again when the automatic one left no result.
+  const analysePhoto = async () => {
+    if (analysing) return;
+    setAnalysing(true); setAnalysisError('');
+    try {
+      const result = await staffApi.photoCheck(id);
+      setData((current) => (current ? { ...current, report: { ...current.report, ...result } } : current));
+    } catch (cause) { setAnalysisError(errorText(cause)); }
+    finally { setAnalysing(false); }
+  };
   const approvedNew = report?.status === 'new' && Boolean(report?.approved_at);
   const inProgress = report?.status === 'in_progress';
   const timeline = report ? buildReportTimeline(report, data?.status_history, data?.field_reviews, {
@@ -172,6 +187,26 @@ export function DetailDrawer({ id, onClose, onUpdated, onToast, onOpen }) {
         <h3 id="dd-decide-title">بانتظار مراجعتك</h3>
         <p>تأكد من الصورة والموقع والتصنيف، ثم اعتمد البلاغ أو اطلب تحققًا ميدانيًا أو ارفضه.</p>
         {nearbyItems.length > 0 && <a className="dd-decide-warn" href="#nearby-title"><CircleAlert size={15} />قد يكون مكررًا: <span className="num">{number(nearbyItems.length)}</span> بلاغ قريب من التصنيف نفسه</a>}
+        {check && <div className={`pc-card is-${check.kind}`} role="note" aria-labelledby="pc-title">
+          <div className="pc-head"><span className="pc-icon" aria-hidden="true"><ScanEye size={16} /></span><strong id="pc-title">فحص الصورة الآلي</strong>{check.confidence && <small>{check.confidence}</small>}</div>
+          <p className="pc-verdict">{check.kind === 'match' ? <>الصورة تطابق التصنيف الذي اختاره المواطن: «{categoryName(report.category)}».</>
+            : check.kind === 'mismatch' ? <>المواطن اختار «{categoryName(report.category)}»، والصورة تبدو «{categoryName(check.suggested)}».</>
+              : <>لا تظهر في الصورة مشكلة واضحة. تأكد منها قبل الاعتماد.</>}</p>
+          {report.ai_reason && <p className="pc-reason">{report.ai_reason}</p>}
+          <div className="pc-foot">
+            {check.kind === 'mismatch' && selectedCategory !== check.suggested && <button type="button" className="button button-quiet pc-use" disabled={busy || verificationOpen} onClick={() => setSelectedCategory(check.suggested)}>اختر «{categoryName(check.suggested)}»</button>}
+            <small>اقتراح آلي قد يخطئ، والقرار لك.</small>
+            <small className="pc-by">{report.ai_checked_by_name ? `أعاد التحليل: ${report.ai_checked_by_name}` : 'حُلّلت تلقائيًا عند الإرسال'} · {fmtDate(report.ai_checked_at)}</small>
+          </div>
+        </div>}
+        {pending && !check && image && <div className={`pc-ask ${analysing ? 'is-busy' : ''}`}>
+          <small id="pc-ask-note">{checkRunning ? 'يجري تحليل الصورة تلقائيًا الآن؛ حدّث التفاصيل بعد لحظات.' : 'لم يكتمل التحليل التلقائي لهذه الصورة، ربما لانقطاع مؤقت في الخدمة.'}</small>
+          <button type="button" className="button button-quiet pc-run" disabled={analysing || busy} onClick={analysePhoto} aria-describedby="pc-ask-note">
+            {analysing ? <><span className="pc-spinner" aria-hidden="true" />جارٍ تحليل الصورة...</> : <><ScanEye size={17} />{checkRunning ? 'تحليل الصورة الآن' : 'إعادة تحليل الصورة'}</>}
+          </button>
+          {analysisError && <p className="pc-error" role="alert"><CircleAlert size={15} />{analysisError}</p>}
+          <span className="sr-only" aria-live="polite">{analysing ? 'جارٍ تحليل الصورة' : ''}</span>
+        </div>}
         <div className="dd-category"><label className="assignment-picker">التصنيف<select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} disabled={verificationOpen}>{Object.entries(categories).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select></label><span>الجهة عند الاعتماد: <strong>{agencies[categoryAgency[selectedCategory]]}</strong></span>{selectedCategory !== report.category && <button className="button button-quiet" disabled={busy || verificationOpen} onClick={() => setModal('category')}>حفظ التصنيف</button>}</div>
         {selectedCategory !== report.category && <small>احفظ التصنيف قبل اعتماد البلاغ أو طلب التحقق.</small>}
         {verificationOpen && <small>أكمل طلب التحقق أو ألغِه قبل تغيير التصنيف.</small>}

@@ -56,6 +56,13 @@ function createStorage(supabase, bucketName, supabaseUrl) {
       return path;
     },
 
+    // A stored photo's bytes, for the photo check run again by staff.
+    async download(path) {
+      const { data, error } = await bucket.download(path);
+      if (error || !data) throw new HttpError(502, 'image storage unavailable');
+      return Buffer.from(await data.arrayBuffer());
+    },
+
     async remove(path) {
       const { error } = await bucket.remove([path]);
       if (error) console.error('Could not remove unused image', error);

@@ -112,6 +112,16 @@ After a report is saved, and after a staff member corrects its location, the API
 
 The server needs internet access for this. Without it, every screen shows the coordinates as before.
 
+### Photo check
+
+After a report is saved, the API sends its photo, shrunk to at most 1024 px and with nothing else about the report, to Claude Haiku 5.5 (`src/photo_check.js`). The answer, one of `pothole`, `water_leak`, `garbage` or `other` with a confidence and a one-sentence Arabic reason, is stored in the `ai_*` columns of `reports` and shown to staff only, as a suggestion while the report awaits review. The citizen gets the response first; a failed check leaves the report without one, and staff can run it again (`POST /api/reports/:id/photo-check`). The first saved result stands.
+
+- `ANTHROPIC_API_KEY` turns it on; without it, reports carry no check and the retry answers 503.
+- `PHOTO_CHECK=off` turns it off while keeping the key; `PHOTO_CHECK_MODEL` picks another model.
+- Run `migrations/20261109_report_photo_check.sql` once on the hosted database before deploying.
+
+A check costs about $0.0002 (roughly 20 cents per thousand reports). On 37 sample photos it agreed with the hand labels 92% of the time and never named one problem type as another.
+
 ## Check
 
 ```powershell
