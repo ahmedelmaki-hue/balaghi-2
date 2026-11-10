@@ -263,8 +263,10 @@ flowchart LR
 
 ```powershell
 cd mobile
-flutter build apk --release --dart-define=BALAGHI_API_BASE_URL=https://balaghi-api.onrender.com/api
+flutter build apk --release --split-per-abi --dart-define=BALAGHI_API_BASE_URL=https://balaghi-api.onrender.com/api
 ```
+
+  يخرج ملف لكل نوع معالج في `mobile/build/app/outputs/flutter-apk/`. للهواتف الحديثة: `app-arm64-v8a-release.apk` (نحو 34 MB)، وللهواتف القديمة: `app-armeabi-v7a-release.apk`.
 
 - **الرسائل:** كل رمز حقيقي يخصم من رصيد «رسالة»؛ استخدم أرقام الاختبار في Supabase للعرض والتجربة.
 - **فحص الصورة الآلي:** يعمل بعد إضافة `ANTHROPIC_API_KEY` في Environment على Render، والمفتاح من console.anthropic.com. بدونه تعمل كل الميزات الأخرى كما هي، ويرد زر «إعادة تحليل الصورة» بأن الفحص غير مفعّل. تكلفة الفحص الواحد نحو 0.0002 دولار. `PHOTO_CHECK=off` يوقفه مع إبقاء المفتاح. رسائل نجاحه وفشله تظهر في Render Logs بعبارة `Photo check for report`.

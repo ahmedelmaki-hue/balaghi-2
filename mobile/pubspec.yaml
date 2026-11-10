@@ -61,6 +61,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  image_picker_platform_interface: ^2.11.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -79,6 +80,8 @@ flutter:
     - assets/demo_pothole.jpg
     - assets/demo_water_leak.jpg
     - assets/demo_garbage.jpg
+    # The Cairo font, bundled so the app never waits on a download to show its text.
+    - assets/google_fonts/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

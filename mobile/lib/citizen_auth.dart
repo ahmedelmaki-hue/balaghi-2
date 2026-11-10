@@ -5,11 +5,18 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 class AuthFailure implements Exception {
-  const AuthFailure(this.message, {this.network = false});
+  const AuthFailure(this.message, {this.network = false, this.status});
   final String message;
 
   /// True when the server could not be reached, not when it refused the request.
   final bool network;
+
+  /// The HTTP status of a reply that was not a success; null without a reply.
+  final int? status;
+
+  /// True when the server refused the session itself (signed out, expired or
+  /// suspended), not when it was restarting, busy or unreachable.
+  bool get sessionRefused => status == 401 || status == 403;
 }
 
 /// Shown when the municipality suspended the citizen's account (HTTP 403).
@@ -155,20 +162,22 @@ class CitizenAuthApi {
       );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      if (response.statusCode == 429) {
+      final status = response.statusCode;
+      if (status == 429) {
         throw AuthFailure(
           path == '/auth/otp/verify'
               ? 'محاولات كثيرة متتالية. انتظر بضع دقائق ثم أعد المحاولة.'
               : 'انتظر قليلًا قبل طلب رمز جديد.',
+          status: status,
         );
       }
-      if (response.statusCode == 403) {
-        throw const AuthFailure(suspendedAccountMessage);
+      if (status == 403) {
+        throw AuthFailure(suspendedAccountMessage, status: status);
       }
-      if (path == '/auth/otp/verify' && response.statusCode == 401) {
-        throw const AuthFailure('رمز تحقق خاطئ');
+      if (path == '/auth/otp/verify' && status == 401) {
+        throw AuthFailure('رمز تحقق خاطئ', status: status);
       }
-      throw const AuthFailure('تعذر إكمال الطلب. حاول مجددًا.');
+      throw AuthFailure('تعذر إكمال الطلب. حاول مجددًا.', status: status);
     }
     try {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -248,8 +257,10 @@ class CitizenAuthApi {
       await store.save(refreshed);
       return refreshed;
     } on AuthFailure catch (error) {
-      // Offline: keep the session so it can be refreshed when the connection returns.
-      if (error.network) return saved;
+      // Only a refusal ends the session. Offline, or with the server restarting
+      // or busy, the session is kept and refreshed on the next try; signing in
+      // again would cost the citizen another SMS code.
+      if (!error.sessionRefused) return saved;
       await store.clear();
       return null;
     } catch (_) {

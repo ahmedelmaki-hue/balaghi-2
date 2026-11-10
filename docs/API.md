@@ -10,7 +10,7 @@
 | POST | `/auth/otp/verify` | عام | التحقق من `phone` و`code` وإرجاع جلسة المستخدم؛ قد يلزمه إكمال الاسم |
 | POST | `/auth/staff/login` | عام | دخول موظف البلدية أو العامل الميداني أو المسؤول بـ`username` و`password` وفق دوره المنشأ إداريًا |
 | POST | `/auth/sms-hook` | Supabase بطلب موقّع | يرسل رمز دخول المواطن عبر منصة «رسالة»؛ لا يستدعيه التطبيق ولا اللوحة |
-| POST | `/auth/refresh` | عام | تجديد جلسة الدخول باستخدام `refresh_token` |
+| POST | `/auth/refresh` | عام | تجديد جلسة الدخول باستخدام `refresh_token`. الجلسة المرفوضة (منتهية أو ملغاة) ترد بـ401 `invalid session`؛ وإذا تعذّر الوصول إلى خدمة الدخول أو كانت مشغولة فالرد 503 `auth service unavailable`، فيحتفظ التطبيق بالجلسة ويعيد المحاولة لاحقًا بدل إخراج المواطن |
 | GET | `/auth/me` | مستخدم | بيانات الحساب الحالي ودوره |
 | PATCH | `/auth/me` | مواطن | حفظ `full_name` عند أول دخول؛ لا يقبل تعديل الدور |
 | POST | `/reports` | مواطن | إنشاء بلاغ: `image`، `category`، `latitude`، `longitude`، `client_request_id`، و`description`/`address_text` اختياريان. الحد 10 بلاغات جديدة لكل مواطن في اليوم بتوقيت طرابلس؛ ما بعدها يرد بـ429 `daily report limit reached`. بعد الرد يملأ الخادم `address_text` باسم الشارع والحي من OpenStreetMap إن لم يُرسَل، ويُجري فحص الصورة الآلي إن كان مفعّلًا |

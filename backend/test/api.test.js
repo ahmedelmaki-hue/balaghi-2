@@ -1544,3 +1544,27 @@ test('the statistics insights come back in one request, for staff only', async (
       { headers: { authorization: 'Bearer citizen-token' } })).status, 403);
   });
 });
+
+test('refresh tells a refused session from an Auth service that could not answer', async () => {
+  const pool = { async query() { throw new Error('the database is not reached'); } };
+  const failing = (error) => () => ({ auth: { async refreshSession() { return { data: {}, error }; } } });
+  const refresh = (base) => jsonRequest(base, '/api/auth/refresh', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ refresh_token: 'saved-token' }),
+  });
+  const refusal = Object.assign(new Error('Invalid Refresh Token: Already Used'), { status: 400 });
+  await withServer({ pool, authClientFactory: failing(refusal), storage: fakeStorage() }, async (base) => {
+    const refused = await refresh(base);
+    assert.equal(refused.status, 401);
+    assert.equal(refused.body.error, 'invalid session');
+  });
+  for (const outage of [Object.assign(new Error('fetch failed'), { status: 0 }),
+    Object.assign(new Error('bad gateway'), { status: 502 }),
+    Object.assign(new Error('too many requests'), { status: 429 }), new Error('unknown')]) {
+    await withServer({ pool, authClientFactory: failing(outage), storage: fakeStorage() }, async (base) => {
+      const busy = await refresh(base);
+      assert.equal(busy.status, 503, outage.message);
+      assert.equal(busy.body.error, 'auth service unavailable');
+    });
+  }
+});

@@ -403,12 +403,18 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     });
   }
 
-  void _back() {
+  /// The arrow in the top bar and the phone's back button do the same thing:
+  /// one step back, and leaving only from the first step or the result screen.
+  Future<void> _back() async {
     if (_sending) return;
-    if (_step == 4 || _step == 0) {
+    if (_step == 4) {
       Navigator.of(
         context,
       ).pop((_createdReport != null || _savedForLater) && !widget.previewMode);
+    } else if (_step == 0) {
+      // Leaving drops the photo and everything entered after it.
+      if (_photo != null && !await _confirmDiscard()) return;
+      if (mounted) Navigator.of(context).pop(false);
     } else {
       setState(() {
         if (_step == 2) _mapReady = false;
@@ -416,6 +422,45 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       });
       if (_step == 2) _promptForLocationOnEntry();
     }
+  }
+
+  Future<bool> _confirmDiscard() async {
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'تجاهل هذا البلاغ؟',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.w800, color: _photoTeal),
+        ),
+        content: const Text(
+          'ستُحذف الصورة والبيانات التي أدخلتها، ولن يُرسل البلاغ.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: _photoSlate, height: 1.6),
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFC93636),
+            ),
+            child: const BalaghiButtonLabel('تجاهل البلاغ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            style: FilledButton.styleFrom(
+              backgroundColor: civicGold,
+              foregroundColor: civicText,
+            ),
+            child: const BalaghiButtonLabel('متابعة البلاغ'),
+          ),
+        ],
+      ),
+    );
+    return discard == true;
   }
 
   void _next() {
@@ -537,38 +582,44 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   @override
   Widget build(BuildContext context) {
     final completed = _step == 4;
-    return Scaffold(
-      backgroundColor: civicBackground,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: _ReportFlowBackdrop()),
-          SafeArea(
-            child: Column(
-              children: [
-                _topBar(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(22, 16, 22, 20),
-                    child: completed
-                        ? _success()
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _heading(),
-                              SizedBox(height: _step >= 2 ? 15 : 28),
-                              if (_step == 0) _photoStep(),
-                              if (_step == 1) _detailsStep(),
-                              if (_step == 2) _locationStep(),
-                              if (_step == 3) _reviewStep(),
-                            ],
-                          ),
+    return PopScope<bool>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back();
+      },
+      child: Scaffold(
+        backgroundColor: civicBackground,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: _ReportFlowBackdrop()),
+            SafeArea(
+              child: Column(
+                children: [
+                  _topBar(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(22, 16, 22, 20),
+                      child: completed
+                          ? _success()
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _heading(),
+                                SizedBox(height: _step >= 2 ? 15 : 28),
+                                if (_step == 0) _photoStep(),
+                                if (_step == 1) _detailsStep(),
+                                if (_step == 2) _locationStep(),
+                                if (_step == 3) _reviewStep(),
+                              ],
+                            ),
+                    ),
                   ),
-                ),
-                _footer(completed),
-              ],
+                  _footer(completed),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

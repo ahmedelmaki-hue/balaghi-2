@@ -335,9 +335,11 @@ class _AccountScreenState extends State<AccountScreen> {
         icon: Icons.privacy_tip_outlined,
         title: 'سياسة الخصوصية',
         subtitle: 'كيف تُستخدم بياناتك وبيانات البلاغات',
-        onTap: () => Navigator.of(
-          context,
-        ).push<void>(MaterialPageRoute(builder: (_) => const _PrivacyScreen())),
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => _PrivacyScreen(previewMode: widget.previewMode),
+          ),
+        ),
       ),
       const SizedBox(height: 18),
       Center(
@@ -588,7 +590,10 @@ class _AccountScreenState extends State<AccountScreen> {
 }
 
 class _PrivacyScreen extends StatelessWidget {
-  const _PrivacyScreen();
+  const _PrivacyScreen({required this.previewMode});
+
+  /// The design preview keeps its data on the device; only then is it explained.
+  final bool previewMode;
 
   @override
   Widget build(BuildContext context) => Directionality(
@@ -614,27 +619,33 @@ class _PrivacyScreen extends StatelessWidget {
       ),
       body: ListView(
         padding: const EdgeInsets.all(22),
-        children: const [
-          _PrivacySection(
+        children: [
+          const _PrivacySection(
             title: 'بيانات الحساب',
             body:
                 'يُستخدم رقم هاتفك للتحقق من الدخول برمز OTP. يُحفظ اسمك ورقم هاتفك في ملف الحساب لربط البلاغات بك.',
           ),
-          _PrivacySection(
+          const _PrivacySection(
             title: 'بيانات البلاغ',
             body:
-                'عند إرسال بلاغ، تُحفظ الصورة والتصنيف والوصف والموقع الذي أكدته. تظهر صورة البلاغ ووصفه وموقعه وحالته على الخريطة العامة.',
+                'عند إرسال بلاغ، تُحفظ الصورة والتصنيف والوصف والموقع الذي أكدته، وتُزال من الصورة بياناتها المخفية مثل مكان التصوير. يراجع موظف البلدية البلاغ أولًا، وبعد اعتماده تظهر صورته ووصفه وموقعه وحالته على الخريطة العامة.',
           ),
-          _PrivacySection(
+          const _PrivacySection(
+            title: 'فحص الصورة آليًا',
+            body:
+                'بعد الإرسال تُفحص صورة البلاغ آليًا عبر خدمة Claude من شركة Anthropic، لتساعد الموظف في التأكد من نوع المشكلة. تُرسل الصورة وحدها، دون اسمك أو رقم هاتفك أو موقع البلاغ. نتيجة الفحص اقتراح يراه الموظف فقط، والقرار له.',
+          ),
+          const _PrivacySection(
             title: 'من يرى بياناتك؟',
             body:
-                'لا يظهر اسمك أو رقم هاتفك في البلاغ العام. يمكن لفريق الإدارة المختص الاطلاع على بيانات المُبلّغ اللازمة لمراجعة البلاغ ومتابعته.',
+                'لا يظهر اسمك أو رقم هاتفك في البلاغ العام، ولا يراهما العامل الميداني الذي ينفّذ الإصلاح. يطّلع عليهما موظفو البلدية المختصون فقط، لمراجعة البلاغ ومتابعته.',
           ),
-          _PrivacySection(
-            title: 'وضع المعاينة',
-            body:
-                'البلاغات التجريبية في وضع المعاينة لا تُرسل إلى البلدية. تُحفظ بيانات معاينة الدخول محليًا على جهازك ويمكن مسحها بتسجيل الخروج.',
-          ),
+          if (previewMode)
+            const _PrivacySection(
+              title: 'وضع المعاينة',
+              body:
+                  'البلاغات التجريبية في وضع المعاينة لا تُرسل إلى البلدية. تُحفظ بيانات معاينة الدخول محليًا على جهازك ويمكن مسحها بتسجيل الخروج.',
+            ),
         ],
       ),
     ),

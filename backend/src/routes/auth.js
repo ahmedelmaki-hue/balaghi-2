@@ -152,6 +152,11 @@ function createAuthRouter({ pool, authClientFactory, authAdmin, auth, limit }) {
     const { data, error } = await authClientFactory().auth.refreshSession({
       refresh_token: refreshToken,
     });
+    // Supabase refuses a bad or revoked token with a 4xx status. Anything else
+    // means Auth was unreachable or busy: the session may still be good, so the
+    // answer is 503 and the app keeps the session instead of signing the citizen out.
+    const refused = error?.status >= 400 && error.status < 500 && error.status !== 429;
+    if (error && !refused) throw new HttpError(503, 'auth service unavailable');
     if (error || !data?.session || !data.user?.id) {
       throw new HttpError(401, 'invalid session');
     }

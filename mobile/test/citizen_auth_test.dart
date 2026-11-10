@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:balaghi/citizen_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -111,5 +112,72 @@ void main() {
       ),
     );
     api.dispose();
+  });
+
+  group('restoring a saved session whose access token expired', () {
+    Future<CitizenSession?> restoreWith(http.Response Function() reply) async {
+      FlutterSecureStorage.setMockInitialValues({
+        'citizen_session': jsonEncode(
+          CitizenSession(
+            accessToken: 'old-access',
+            refreshToken: 'saved-refresh',
+            phone: '+218912345678',
+            fullName: 'أحمد الحي',
+            expiresAt: DateTime.now().subtract(const Duration(hours: 2)),
+          ).toJson(),
+        ),
+      });
+      final api = CitizenAuthApi(
+        baseUrl: 'https://example.test/api',
+        client: MockClient((_) async => reply()),
+      );
+      addTearDown(api.dispose);
+      return api.restore(const CitizenAuthStore());
+    }
+
+    test(
+      'a server that is restarting or busy keeps the citizen signed in',
+      () async {
+        for (final status in [500, 502, 503, 429]) {
+          final session = await restoreWith(
+            () => http.Response('busy', status),
+          );
+          expect(session?.refreshToken, 'saved-refresh', reason: '$status');
+          expect(await const CitizenAuthStore().load(), isNotNull);
+        }
+      },
+    );
+
+    test('a refused session signs the citizen out', () async {
+      for (final status in [401, 403]) {
+        final session = await restoreWith(
+          () => http.Response('{"error":"invalid session"}', status),
+        );
+        expect(session, isNull, reason: '$status');
+        expect(await const CitizenAuthStore().load(), isNull);
+      }
+    });
+
+    test('a successful refresh replaces the saved session', () async {
+      final session = await restoreWith(
+        () => http.Response(
+          jsonEncode({
+            'user': {'phone': '+218912345678', 'full_name': 'أحمد الحي'},
+            'session': {
+              'access_token': 'new-access',
+              'refresh_token': 'new-refresh',
+              'expires_in': 3600,
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        ),
+      );
+      expect(session?.accessToken, 'new-access');
+      expect(
+        (await const CitizenAuthStore().load())?.refreshToken,
+        'new-refresh',
+      );
+    });
   });
 }

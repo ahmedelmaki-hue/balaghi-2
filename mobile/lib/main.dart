@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +14,13 @@ const _showOnboardingEveryLaunch = false;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Cairo ships inside the app (assets/google_fonts) under the Open Font
+  // License, which asks for its text to be shown with the app's licences.
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'Cairo',
+    ], await rootBundle.loadString('assets/google_fonts/OFL.txt'));
+  });
   runApp(const BalaghiApp());
 }
 

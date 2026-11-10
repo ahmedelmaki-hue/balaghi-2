@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:balaghi/account_screen.dart';
+import 'package:balaghi/citizen_auth.dart';
 import 'package:balaghi/citizen_auth_preview_store.dart';
 import 'package:balaghi/welcome_appearance_store.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -76,4 +80,46 @@ void main() {
     expect(await appearance.loadDark(), isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'the privacy policy explains the photo check, and preview notes stay out of a real build',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      FlutterSecureStorage.setMockInitialValues({
+        'citizen_session': jsonEncode(
+          CitizenSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            phone: '+218912345678',
+            fullName: 'أحمد المكي',
+            expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          ).toJson(),
+        ),
+      });
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        const MaterialApp(home: AccountScreen(previewMode: false)),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('سياسة الخصوصية'),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.text('سياسة الخصوصية'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('فحص الصورة آليًا'), findsOneWidget);
+      expect(find.textContaining('Anthropic'), findsOneWidget);
+      expect(find.textContaining('بعد اعتماده'), findsOneWidget);
+      expect(find.text('وضع المعاينة'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
