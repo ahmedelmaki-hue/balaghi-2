@@ -98,21 +98,23 @@ void main() {
 
       await tester.tap(find.text('فتح التفاصيل'));
       await tester.pumpAndSettle();
-      expect(find.text('تسرب مياه – شارع المدرسة'), findsOneWidget);
+      // One summary card: the type, its state, then where and when.
+      expect(find.text('تسرب مياه'), findsOneWidget);
       expect(find.text('تم الحل'), findsOneWidget);
-      expect(find.text('تسرب مياه'), findsNothing);
+      expect(find.text('شارع المدرسة'), findsOneWidget);
+      expect(find.textContaining('أُرسل '), findsOneWidget);
       expect(find.text('تسرب بالقرب من المدرسة.'), findsOneWidget);
-      expect(find.text('رقم البلاغ: 99'), findsOneWidget);
+      expect(find.text('#99'), findsOneWidget);
       expect(renderedMapReport?.location, report.location);
+      expect(find.text('فتح الموقع في الخرائط'), findsOneWidget);
       expect(find.text('مشاركة تفاصيل البلاغ'), findsOneWidget);
-      expect(find.text('خريطة الموقع'), findsNothing);
       expect(
-        tester.getTopLeft(find.text('رقم البلاغ: 99')).dy,
-        lessThan(tester.getTopLeft(find.text('تسرب مياه – شارع المدرسة')).dy),
+        tester.getTopLeft(find.text('#99')).dy,
+        lessThan(tester.getTopLeft(find.text('تسرب مياه')).dy),
       );
       expect(
-        tester.getTopLeft(find.text('رقم البلاغ: 99')).dy,
-        lessThan(tester.getTopLeft(find.text('تم الحل')).dy),
+        tester.getTopLeft(find.text('تسرب مياه')).dy,
+        lessThan(tester.getTopLeft(find.text('شارع المدرسة')).dy),
       );
       expect(tester.takeException(), isNull);
       expect(tester.getTopLeft(find.byTooltip('رجوع')).dx, greaterThan(250));

@@ -100,6 +100,8 @@ class BalaghiGoldButton extends StatelessWidget {
     this.loading = false,
     this.fontSize = 17,
     this.textColor = civicWarmInk,
+    this.height = 58,
+    this.icon,
   });
 
   final String label;
@@ -107,11 +109,15 @@ class BalaghiGoldButton extends StatelessWidget {
   final bool loading;
   final double fontSize;
   final Color textColor;
+  final double height;
+
+  /// Shown before the label, for actions such as "+ إبلاغ جديد".
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    height: 58,
+    height: height,
     decoration: BoxDecoration(
       gradient: const LinearGradient(
         colors: [Color(0xFFFBBF24), civicWarmGold, Color(0xFFF59E0B)],
@@ -139,12 +145,24 @@ class BalaghiGoldButton extends StatelessWidget {
                     color: textColor,
                   ),
                 )
-              : BalaghiButtonLabel(
-                  label,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.w800,
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, color: textColor, size: fontSize + 7),
+                        const SizedBox(width: 6),
+                      ],
+                      BalaghiButtonLabel(
+                        label,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
         ),

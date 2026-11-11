@@ -120,7 +120,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('بلاغاتي'), findsOneWidget);
-    expect(find.textContaining('بلاغات تجريبية'), findsOneWidget);
+    // The preview shows its sample reports without a note about them.
+    expect(find.textContaining('بلاغات تجريبية'), findsNothing);
     expect(find.text('حفرة'), findsOneWidget);
     await tester.tap(find.text('قيد المعالجة'));
     await tester.pumpAndSettle();

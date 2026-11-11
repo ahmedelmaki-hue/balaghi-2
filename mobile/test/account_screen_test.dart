@@ -43,8 +43,7 @@ void main() {
     await tester.tap(find.text('فتح الحساب'));
     await tester.pumpAndSettle();
     expect(find.text('أحمد المكي'), findsOneWidget);
-    expect(find.text('+218912345678'), findsOneWidget);
-    expect(find.text('وضع المعاينة'), findsOneWidget);
+    expect(find.text('0912345678'), findsOneWidget);
     await tester.tap(find.text('تعديل الاسم'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), 'أحمد لؤي المكي');

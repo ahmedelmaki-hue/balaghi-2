@@ -268,7 +268,6 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
               child: Column(
                 children: [
                   _header(),
-                  _intro(),
                   _filters(),
                   Expanded(child: _body()),
                   _footer(),
@@ -281,8 +280,9 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     ),
   );
 
+  /// The title in the middle, back on the side, as on the report details.
   Widget _header() => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
     child: SizedBox(
       height: 48,
       child: Stack(
@@ -292,12 +292,12 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
             'بلاغاتي',
             style: TextStyle(
               color: _ink,
-              fontSize: 23,
+              fontSize: 21,
               fontWeight: FontWeight.w800,
             ),
           ),
           Align(
-            alignment: Alignment.centerRight,
+            alignment: AlignmentDirectional.centerStart,
             child: BalaghiBackButton(
               onPressed: () => Navigator.of(context).pop(),
             ),
@@ -307,87 +307,70 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     ),
   );
 
-  Widget _intro() => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 3, 20, 19),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'تابع بلاغاتك وتطور معالجتها',
-          style: TextStyle(
-            color: _muted,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        if (widget.previewMode) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.76),
-              border: Border.all(color: _border),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.visibility_outlined, color: _ink, size: 19),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'معاينة ببلاغات تجريبية؛ البلاغات هنا غير محفوظة.',
-                    style: TextStyle(
-                      color: _ink,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+  /// The four filters side by side, like the categories on the map.
+  Widget _filters() => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Container(
+      height: 48,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+      ),
+      child: Row(
+        children: [
+          _filterButton(null, 'الكل'),
+          for (final status in ReportStatus.values)
+            _filterButton(status, status.label),
         ],
-      ],
-    ),
-  );
-
-  Widget _filters() => SizedBox(
-    height: 48,
-    child: ListView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      children: [
-        _filterButton(null, 'الكل'),
-        for (final status in ReportStatus.values)
-          _filterButton(status, status.label),
-      ],
+      ),
     ),
   );
 
   Widget _filterButton(ReportStatus? status, String label) {
     final selected = _filter == status;
-    final color = status == null ? _ink : statusColor(status);
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(end: 8),
-      child: Material(
-        color: selected ? color : Colors.white.withValues(alpha: 0.87),
-        borderRadius: BorderRadius.circular(25),
-        child: InkWell(
-          onTap: () => _setFilter(status),
-          borderRadius: BorderRadius.circular(25),
-          child: Container(
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              border: Border.all(color: selected ? color : _border),
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: BalaghiButtonLabel(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : color,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+    return Expanded(
+      flex: status == ReportStatus.inProgress ? 14 : 10,
+      child: Semantics(
+        selected: selected,
+        button: true,
+        child: Material(
+          color: selected ? _ink : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: () => _setFilter(status),
+            borderRadius: BorderRadius.circular(12),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (status != null) ...[
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: statusColor(status),
+                          shape: BoxShape.circle,
+                          border: selected
+                              ? Border.all(color: Colors.white, width: 1.2)
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    BalaghiButtonLabel(
+                      label,
+                      style: TextStyle(
+                        color: selected ? Colors.white : _ink,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -430,7 +413,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
       onRefresh: _load,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 22),
         itemCount:
             pending.length +
             _reports.length +
@@ -519,240 +502,256 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     ),
   );
 
-  Widget _reportCard(MyReport report) {
-    final rejected = report.isRejected;
-    final updated = _updated.contains(report.id);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+  /// One card shape for every report: photo, type, place, date and state, and
+  /// under it a note when the report waits for review or was refused.
+  Widget _cardShell({
+    required Widget top,
+    Widget? note,
+    Widget? actions,
+    VoidCallback? onTap,
+    bool highlighted = false,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F12323F),
+            blurRadius: 16,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
       child: Material(
-        color: Colors.white,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          onTap: rejected ? null : () => _openReport(report),
+          onTap: onTap,
           borderRadius: BorderRadius.circular(20),
-          child: Container(
+          child: Ink(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
+              color: Colors.white,
               border: Border.all(
-                color: updated ? _gold : _border,
-                width: updated ? 1.5 : 1,
+                color: highlighted ? _gold : _border,
+                width: highlighted ? 1.6 : 1,
               ),
               borderRadius: BorderRadius.circular(20),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1012323F),
-                  blurRadius: 16,
-                  offset: Offset(0, 5),
-                ),
-              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _thumbnail(report),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  report.category.singularLabel,
-                                  style: const TextStyle(
-                                    color: _ink,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              if (updated) ...[
-                                const SizedBox(width: 7),
-                                _updatedPill(),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            report.addressText ?? 'موقع البلاغ على الخريطة',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: _muted, fontSize: 12),
-                          ),
-                          const SizedBox(height: 9),
-                          Text(
-                            reportDate(report.createdAt),
-                            style: const TextStyle(color: _muted, fontSize: 11),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    rejected
-                        ? _rejectedPill()
-                        : report.isPendingReview
-                        ? _pendingPill()
-                        : ReportStatusPill(status: report.status!),
-                  ],
-                ),
-                if (rejected && report.rejectionReason != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F4),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'سبب الرفض: ${report.rejectionReason}',
-                      style: const TextStyle(color: _muted, fontSize: 12),
-                    ),
-                  ),
-                ],
-                if (!rejected) ...[
-                  if (report.isPendingReview) ...[
-                    const SizedBox(height: 11),
-                    const Text(
-                      'البلاغ بانتظار مراجعة الجهة المختصة قبل ظهوره على الخريطة العامة.',
-                      style: TextStyle(
-                        color: _muted,
-                        fontSize: 12,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      BalaghiButtonLabel(
-                        'عرض التفاصيل',
-                        style: TextStyle(
-                          color: _ink,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(width: 3),
-                      Icon(Icons.chevron_left_rounded, color: _ink, size: 19),
-                    ],
-                  ),
-                ],
+                top,
+                if (note != null) ...[const SizedBox(height: 10), note],
+                ?actions,
               ],
             ),
           ),
         ),
       ),
+    ),
+  );
+
+  Widget _cardTop({
+    required Widget thumbnail,
+    required String title,
+    required String place,
+    required DateTime date,
+    required Widget pill,
+    Widget? mark,
+    bool opens = false,
+  }) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      thumbnail,
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (mark != null) ...[const SizedBox(width: 7), mark],
+              ],
+            ),
+            const SizedBox(height: 4),
+            _metaLine(Icons.location_on_outlined, place),
+            const SizedBox(height: 3),
+            _metaLine(Icons.schedule_rounded, reportDate(date)),
+          ],
+        ),
+      ),
+      const SizedBox(width: 6),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          pill,
+          if (opens) ...[
+            const SizedBox(height: 18),
+            const Icon(Icons.chevron_left_rounded, color: _muted, size: 22),
+          ],
+        ],
+      ),
+    ],
+  );
+
+  Widget _metaLine(IconData icon, String text) => Row(
+    children: [
+      Icon(icon, size: 14, color: _muted),
+      const SizedBox(width: 4),
+      Expanded(
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: _muted, fontSize: 12.5),
+        ),
+      ),
+    ],
+  );
+
+  /// A tinted strip inside a card: why the report waits, or why it was refused.
+  Widget _cardNote(
+    IconData icon,
+    String text, {
+    Color color = const Color(0xFF8A5A00),
+    Color background = const Color(0xFFFFF7E6),
+  }) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, size: 16, color: color),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(color: color, fontSize: 12.5, height: 1.55),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _reportCard(MyReport report) {
+    final rejected = report.isRejected;
+    final updated = _updated.contains(report.id);
+    return _cardShell(
+      onTap: rejected ? null : () => _openReport(report),
+      highlighted: updated,
+      top: _cardTop(
+        thumbnail: _thumbnail(report),
+        title: report.category.singularLabel,
+        place: report.addressText ?? 'موقع البلاغ على الخريطة',
+        date: report.createdAt,
+        pill: rejected
+            ? _rejectedPill()
+            : report.isPendingReview
+            ? _pendingPill()
+            : ReportStatusPill(status: report.status!),
+        mark: updated ? _updatedPill() : null,
+        opens: !rejected,
+      ),
+      note: rejected && report.rejectionReason != null
+          ? _cardNote(
+              Icons.info_outline_rounded,
+              'سبب الرفض: ${report.rejectionReason}',
+              color: const Color(0xFF6B4B47),
+              background: const Color(0xFFF7EEEC),
+            )
+          : !rejected && report.isPendingReview
+          ? _cardNote(
+              Icons.hourglass_top_rounded,
+              'بانتظار مراجعة البلدية قبل ظهوره على الخريطة العامة.',
+            )
+          : null,
     );
   }
 
   Widget _pendingCard(PendingReport report, {required bool first}) {
     // Sending stops at the first failure, so a server refusal belongs to the first card.
     final error = first ? _pendingError : null;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: _border),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x1012323F),
-              blurRadius: 16,
-              offset: Offset(0, 5),
+    return _cardShell(
+      top: _cardTop(
+        thumbnail: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            width: 72,
+            height: 72,
+            child: Image.file(
+              File(report.imagePath),
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _imagePlaceholder(report.category),
             ),
-          ],
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        title: report.category.singularLabel,
+        place: 'محفوظ على جهازك',
+        date: report.savedAt,
+        pill: _awaitingSendPill(),
+      ),
+      note: _cardNote(
+        error == null ? Icons.cloud_off_rounded : Icons.error_outline_rounded,
+        error == null
+            ? 'لم يصل البلاغ إلى البلدية بعد. سيُرسل تلقائيًا عند عودة الاتصال.'
+            : 'تعذّر إرسال البلاغ: $error',
+        color: error == null ? _ink : const Color(0xFFB3261E),
+        background: error == null
+            ? const Color(0xFFEFF4F5)
+            : const Color(0xFFFBECEA),
+      ),
+      actions: Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(13),
-                  child: SizedBox(
-                    width: 78,
-                    height: 78,
-                    child: Image.file(
-                      File(report.imagePath),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          _imagePlaceholder(report.category),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        report.category.singularLabel,
-                        style: const TextStyle(
-                          color: _ink,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      const Text(
-                        'محفوظ على جهازك',
-                        style: TextStyle(color: _muted, fontSize: 12),
-                      ),
-                      const SizedBox(height: 9),
-                      Text(
-                        reportDate(report.savedAt),
-                        style: const TextStyle(color: _muted, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 4),
-                _awaitingSendPill(),
-              ],
+            TextButton(
+              onPressed: () => _deletePending(report),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFB3261E),
+                minimumSize: const Size(48, 44),
+              ),
+              child: const BalaghiButtonLabel(
+                'حذف',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
             ),
-            const SizedBox(height: 11),
-            Text(
-              error == null
-                  ? 'لم يصل البلاغ إلى البلدية بعد. سيُرسل تلقائيًا عند عودة الاتصال.'
-                  : 'تعذّر إرسال البلاغ: $error',
-              style: const TextStyle(color: _muted, fontSize: 12, height: 1.5),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => _deletePending(report),
-                  child: const BalaghiButtonLabel(
-                    'حذف',
-                    style: TextStyle(
-                      color: _muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+            const SizedBox(width: 6),
+            OutlinedButton.icon(
+              onPressed: _load,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _ink,
+                side: const BorderSide(color: _border),
+                minimumSize: const Size(48, 44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                TextButton.icon(
-                  onPressed: _load,
-                  icon: const Icon(Icons.send_rounded, color: _ink, size: 17),
-                  label: const BalaghiButtonLabel(
-                    'إرسال الآن',
-                    style: TextStyle(
-                      color: _ink,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
+              ),
+              icon: const Icon(Icons.send_rounded, size: 17),
+              label: const BalaghiButtonLabel(
+                'إرسال الآن',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),
@@ -760,31 +759,37 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     );
   }
 
-  Widget _awaitingSendPill() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(
-      color: const Color(0xFFE8EEF1),
-      borderRadius: BorderRadius.circular(30),
-    ),
-    child: const Text(
-      'بانتظار الإرسال',
-      style: TextStyle(color: _ink, fontSize: 11, fontWeight: FontWeight.w700),
-    ),
+  Widget _awaitingSendPill() => _plainPill(
+    'بانتظار الإرسال',
+    color: _ink,
+    background: const Color(0xFFE8EEF1),
   );
 
-  Widget _pendingPill() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+  Widget _pendingPill() => _plainPill(
+    'بانتظار المراجعة',
+    color: const Color(0xFF9A6700),
+    background: const Color(0xFFFFF3D6),
+  );
+
+  Widget _rejectedPill() => _plainPill(
+    'مرفوض',
+    color: const Color(0xFF5F6366),
+    background: const Color(0xFFEEEFEF),
+  );
+
+  Widget _plainPill(
+    String label, {
+    required Color color,
+    required Color background,
+  }) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFF3D6),
-      borderRadius: BorderRadius.circular(30),
+      color: background,
+      borderRadius: BorderRadius.circular(999),
     ),
-    child: const Text(
-      'بانتظار المراجعة',
-      style: TextStyle(
-        color: Color(0xFF9A6700),
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-      ),
+    child: Text(
+      label,
+      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700),
     ),
   );
 
@@ -794,32 +799,16 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _ink,
-        borderRadius: BorderRadius.circular(30),
+        color: _gold,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: const Text(
         'تحدّث',
         style: TextStyle(
-          color: Colors.white,
-          fontSize: 10,
+          color: _ink,
+          fontSize: 11,
           fontWeight: FontWeight.w800,
         ),
-      ),
-    ),
-  );
-
-  Widget _rejectedPill() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(
-      color: const Color(0xFFF0F0EF),
-      borderRadius: BorderRadius.circular(30),
-    ),
-    child: const Text(
-      'مرفوض',
-      style: TextStyle(
-        color: Color(0xFF686868),
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
       ),
     ),
   );
@@ -828,10 +817,10 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     final imageUrl = report.imageUrl;
     final assetPath = widget.previewMode ? _demoAsset(report.category) : null;
     final thumbnail = ClipRRect(
-      borderRadius: BorderRadius.circular(13),
+      borderRadius: BorderRadius.circular(14),
       child: SizedBox(
-        width: 78,
-        height: 78,
+        width: 72,
+        height: 72,
         child: widget.previewMode
             ? Image.asset(assetPath!, fit: BoxFit.cover)
             : report.imageUrl != null
@@ -863,53 +852,18 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
   );
 
   Widget _footer() => Container(
-    padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
     decoration: const BoxDecoration(
       color: Color(0xF9FCF9F2),
       border: Border(top: BorderSide(color: _border)),
     ),
-    child: SizedBox(
-      width: double.infinity,
+    child: BalaghiGoldButton(
+      label: 'إنشاء بلاغ جديد',
+      icon: Icons.add_rounded,
+      onPressed: _openCreate,
       height: 56,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFBBF24), _gold, Color(0xFFF59E0B)],
-          ),
-          borderRadius: BorderRadius.circular(17),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x45E5A93C),
-              blurRadius: 15,
-              offset: Offset(0, 7),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _openCreate,
-            borderRadius: BorderRadius.circular(17),
-            child: const Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.add_rounded, color: _ink, size: 23),
-                  SizedBox(width: 8),
-                  BalaghiButtonLabel(
-                    'إنشاء بلاغ جديد',
-                    style: TextStyle(
-                      color: _ink,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+      fontSize: 16,
+      textColor: _ink,
     ),
   );
 }

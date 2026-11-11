@@ -357,7 +357,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: _showDarkWelcome ? _welcomeMuted : _muted,
-                            fontSize: 11,
+                            fontSize: 12.5,
                           ),
                         ),
                       ],
@@ -400,112 +400,128 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
     ],
   );
 
-  Widget _welcome() => Column(
-    mainAxisAlignment: MainAxisAlignment.spaceAround,
-    children: [
-      Align(
-        alignment: Alignment.centerRight,
-        child: !_darkWelcome
-            ? BalaghiBackButton(onPressed: _busy ? null : _back)
-            : Tooltip(
-                message: 'رجوع',
-                child: Material(
-                  color: const Color(0x1F67BDCA),
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    onTap: _busy ? null : _back,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0x4067BDCA)),
+  /// The back button pinned to the top like on the other steps; the rest of
+  /// the welcome spreads over the screen below it.
+  Widget _welcome() => SizedBox(
+    width: double.infinity,
+    child: Stack(
+      fit: StackFit.passthrough,
+      children: [
+        Column(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            const SizedBox(height: 44),
+            Column(
+              children: [
+                if (_darkWelcome)
+                  Container(
+                    width: 108,
+                    height: 108,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(30),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0x3345B7C8), Color(0x143CA0B4)],
                       ),
-                      child: const Icon(
-                        Icons.chevron_right_rounded,
-                        textDirection: TextDirection.ltr,
-                        size: 25,
-                        color: Colors.white,
+                      border: Border.all(color: const Color(0x5567CAD8)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x4444ADBD),
+                          blurRadius: 42,
+                          spreadRadius: 3,
+                        ),
+                      ],
+                    ),
+                    child: const _BrandMark(size: 82),
+                  )
+                else
+                  const _BrandMark(size: 82),
+                const SizedBox(height: 17),
+                Text(
+                  'بلاغي',
+                  style: TextStyle(
+                    color: _darkWelcome ? Colors.white : _ink,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  'بلّغ، تابع، وحلّ',
+                  style: TextStyle(
+                    color: _darkWelcome
+                        ? _welcomeMuted
+                        : const Color(0xFF2B2F2F),
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+            AuthIllustration(
+              scene: AuthIllustrationScene.welcome,
+              dark: _darkWelcome,
+            ),
+            Column(
+              children: [
+                Text(
+                  'ساهم في تحسين مدينتك',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _darkWelcome ? Colors.white : _ink,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'صوّر المشكلة، تابع البلاغات، وشارك\nبخطوة واحدة في كل مرة',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _darkWelcome
+                        ? _welcomeMuted
+                        : const Color(0xFF2B2F2F),
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        Positioned(
+          top: 0,
+          right: 0,
+          child: !_darkWelcome
+              ? BalaghiBackButton(onPressed: _busy ? null : _back)
+              : Tooltip(
+                  message: 'رجوع',
+                  child: Material(
+                    color: const Color(0x1F67BDCA),
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      onTap: _busy ? null : _back,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0x4067BDCA)),
+                        ),
+                        child: const Icon(
+                          Icons.chevron_right_rounded,
+                          textDirection: TextDirection.ltr,
+                          size: 25,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-      ),
-      Column(
-        children: [
-          if (_darkWelcome)
-            Container(
-              width: 108,
-              height: 108,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(30),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0x3345B7C8), Color(0x143CA0B4)],
-                ),
-                border: Border.all(color: const Color(0x5567CAD8)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x4444ADBD),
-                    blurRadius: 42,
-                    spreadRadius: 3,
-                  ),
-                ],
-              ),
-              child: const _BrandMark(size: 82),
-            )
-          else
-            const _BrandMark(size: 82),
-          const SizedBox(height: 17),
-          Text(
-            'بلاغي',
-            style: TextStyle(
-              color: _darkWelcome ? Colors.white : _ink,
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            'بلّغ، تابع، وحلّ',
-            style: TextStyle(
-              color: _darkWelcome ? _welcomeMuted : const Color(0xFF2B2F2F),
-              fontSize: 15,
-            ),
-          ),
-        ],
-      ),
-      AuthIllustration(
-        scene: AuthIllustrationScene.welcome,
-        dark: _darkWelcome,
-      ),
-      Column(
-        children: [
-          Text(
-            'ساهم في تحسين مدينتك',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _darkWelcome ? Colors.white : _ink,
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'صوّر المشكلة، تابع البلاغات، وشارك\nبخطوة واحدة في كل مرة',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _darkWelcome ? _welcomeMuted : const Color(0xFF2B2F2F),
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    ],
+        ),
+      ],
+    ),
   );
 
   Widget _phonePage() => Column(
@@ -588,9 +604,17 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
             ),
             const SizedBox(height: 9),
             Text(
-              _phone ?? '',
+              _phone == null
+                  ? ''
+                  : _phone!.startsWith('+218')
+                  ? '0${_phone!.substring(4)}'
+                  : _phone!,
               textDirection: TextDirection.ltr,
-              style: const TextStyle(color: _ink, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
@@ -605,7 +629,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
           children: [
             const Text(
               'لم يصلك الرمز؟ ',
-              style: TextStyle(color: _muted, fontSize: 12),
+              style: TextStyle(color: _muted, fontSize: 13),
             ),
             TextButton(
               onPressed: _resendSeconds == 0 && !_busy ? _resendCode : null,
@@ -615,7 +639,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
                     : 'إعادة الإرسال',
                 style: TextStyle(
                   color: _resendSeconds > 0 ? _muted : civicTeal,
-                  fontSize: 12,
+                  fontSize: 13,
                 ),
               ),
             ),

@@ -19,10 +19,8 @@ import 'report_ui.dart';
 
 const _tripoli = LatLng(32.8912, 13.1905);
 const _muted = Color(0xFF75858A);
-const _line = Color(0xFFE2EAED);
 const _orangeWash = Color(0xFFFFF5E8);
 const _photoTeal = Color(0xFF12323F);
-const _photoTealLight = Color(0xFF1E4A5C);
 const _photoGold = Color(0xFFE5A93C);
 const _photoSlate = Color(0xFF5F7382);
 const _reportBackground = Color(0xFFFCF9F2);
@@ -82,9 +80,18 @@ bool _isInsideTripoliCenter(LatLng point) {
 }
 
 class CreateReportScreen extends StatefulWidget {
-  const CreateReportScreen({super.key, required this.previewMode});
+  const CreateReportScreen({
+    super.key,
+    required this.previewMode,
+    this.mapBackground,
+  });
 
   final bool previewMode;
+
+  /// Drawn instead of the live map tiles in design previews and tests, which
+  /// cannot run the phone's map engine.
+  @visibleForTesting
+  final Widget Function()? mapBackground;
 
   @override
   State<CreateReportScreen> createState() => _CreateReportScreenState();
@@ -391,13 +398,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     _mapController.move(camera.center, zoom);
   }
 
-  String _formattedMapCenter() {
-    final lat = _mapCenter.latitude;
-    final lon = _mapCenter.longitude;
-    return '${lat.abs().toStringAsFixed(5)}° ${lat >= 0 ? 'N' : 'S'}, '
-        '${lon.abs().toStringAsFixed(5)}° ${lon >= 0 ? 'E' : 'W'}';
-  }
-
   void _message(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -643,23 +643,13 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Text(
-                'بلاغي',
-                style: TextStyle(
-                  color: _photoTeal,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const PositionedDirectional(
-                end: -14,
-                top: 11,
-                child: _PhotoBrandPulse(),
-              ),
-            ],
+          Text(
+            'بلاغ جديد',
+            style: const TextStyle(
+              color: _photoTeal,
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           Align(
             alignment: AlignmentDirectional.centerStart,
@@ -691,180 +681,74 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     ),
   );
 
-  Widget _heading() {
-    if (_step == 0) return _photoHeading();
-    if (_step == 1) return _detailsHeading();
-    if (_step == 2) return _locationHeading();
-    if (_step == 3) return _reviewHeading();
-    const titles = [
-      'صوّر المشكلة',
-      'تفاصيل البلاغ',
-      'حدد موقع المشكلة',
-      'راجع بلاغك',
-    ];
-    const hints = [
-      'التقط صورة واضحة للمشكلة التي تريد الإبلاغ عنها.',
-      'اختر نوع المشكلة وأضف تفاصيل تساعد في فهمها.',
-      'حدد مكان المشكلة بدقة على الخريطة.',
-      'تأكد من المعلومات قبل إرسالها إلى البلدية.',
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'الخطوة ${_step + 1} من 4',
-          style: const TextStyle(
-            color: civicTeal,
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          titles[_step],
-          style: const TextStyle(
-            color: civicText,
-            fontSize: 27,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(hints[_step], style: const TextStyle(color: _muted, fontSize: 14)),
-        const SizedBox(height: 22),
-        Row(
-          children: List.generate(
-            4,
-            (index) => Expanded(
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(end: 5),
-                child: Container(
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: index <= _step ? civicTeal : _line,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  static const _stepTitles = [
+    'صوّر المشكلة',
+    'تفاصيل البلاغ',
+    'حدد موقع المشكلة',
+    'راجع بلاغك',
+  ];
+  static const _stepHints = [
+    'التقط صورة واضحة تساعد فريق البلدية على التحقق من المشكلة.',
+    'اختر نوع المشكلة، وأضف وصفًا إن أردت.',
+    'اختر طريقة تحديد الموقع، ثم راجع موضع المؤشر على الخريطة.',
+    'تأكد من المعلومات قبل إرسالها إلى البلدية.',
+  ];
 
-  Widget _photoHeading() => Column(
+  /// The same heading on every step: where the citizen is, then what to do.
+  Widget _heading() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Row(
-        children: [
-          const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(radius: 3, backgroundColor: _photoGold),
-              SizedBox(width: 7),
-              Text(
-                'الخطوة الأولى',
-                style: TextStyle(
-                  color: _photoTeal,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                ),
+      Semantics(
+        label: 'الخطوة ${_step + 1} من 4',
+        excludeSemantics: true,
+        child: Row(
+          children: [
+            Text(
+              'الخطوة ${_step + 1} من 4',
+              style: const TextStyle(
+                color: _photoTeal,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
               ),
-            ],
-          ),
-          const Spacer(),
-          const Text(
-            '١ من ٤',
-            style: TextStyle(
-              color: _photoSlate,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
             ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 8),
-      Row(
-        children: List.generate(
-          4,
-          (index) => Expanded(
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(end: 6),
-              child: SizedBox(
-                height: 12,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      height: 5,
-                      decoration: BoxDecoration(
-                        gradient: index == 0
-                            ? const LinearGradient(
-                                colors: [_photoTealLight, _photoTeal],
-                              )
-                            : null,
-                        color: index == 0 ? null : const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    if (index == 0)
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: Container(
-                          width: 9,
-                          height: 9,
-                          decoration: const BoxDecoration(
-                            color: _photoGold,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0x66E5A93C),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Row(
+                children: [
+                  for (var index = 0; index < 4; index++)
+                    Expanded(
+                      child: Container(
+                        height: 6,
+                        margin: const EdgeInsetsDirectional.only(end: 5),
+                        decoration: BoxDecoration(
+                          color: index < _step
+                              ? _photoTeal
+                              : index == _step
+                              ? _photoGold
+                              : const Color(0xFFE2E8EA),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             ),
-          ),
+          ],
         ),
       ),
-      const SizedBox(height: 28),
-      Align(
-        alignment: Alignment.centerRight,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: _photoTeal.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: _photoTeal.withValues(alpha: 0.10)),
-          ),
-          child: const Text(
-            'توثيق البلاغ',
-            style: TextStyle(
-              color: _photoTeal,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 7),
-      const Text(
-        'صوّر المشكلة',
-        style: TextStyle(
+      const SizedBox(height: 18),
+      Text(
+        _stepTitles[_step],
+        style: const TextStyle(
           color: _photoTeal,
-          fontSize: 26,
+          fontSize: 25,
           fontWeight: FontWeight.w800,
         ),
       ),
-      const SizedBox(height: 5),
-      const Text(
-        'التقط صورة واضحة تساعد فريق المعالجة على التحقق وحل المشكلة بسرعة',
-        style: TextStyle(color: _photoSlate, fontSize: 12, height: 1.6),
+      const SizedBox(height: 4),
+      Text(
+        _stepHints[_step],
+        style: const TextStyle(color: _photoSlate, fontSize: 13.5, height: 1.6),
       ),
     ],
   );
@@ -1199,98 +1083,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     ),
   );
 
-  Widget _detailsHeading() => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      const Row(
-        children: [
-          CircleAvatar(radius: 3, backgroundColor: _photoGold),
-          SizedBox(width: 7),
-          Text(
-            'الخطوة الثانية',
-            style: TextStyle(
-              color: _photoTeal,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 10),
-      Row(
-        children: List.generate(
-          4,
-          (index) => Expanded(
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(end: 7),
-              child: SizedBox(
-                height: 11,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: index < 2 ? _photoTeal : const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    if (index == 1)
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: _photoGold,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0x66E5A93C),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 29),
-      Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE9EDF0),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: const Text(
-            'بيانات البلاغ',
-            style: TextStyle(
-              color: _photoSlate,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 8),
-      const Text(
-        'تفاصيل البلاغ',
-        style: TextStyle(
-          color: _photoTeal,
-          fontSize: 27,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    ],
-  );
-
   Widget _detailsStep() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -1316,7 +1108,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
               'إجباري',
               style: TextStyle(
                 color: _photoGold,
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1349,7 +1141,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
             valueListenable: _description,
             builder: (context, value, child) => Text(
               '${value.text.length}/2000',
-              style: const TextStyle(color: _photoSlate, fontSize: 11),
+              style: const TextStyle(color: _photoSlate, fontSize: 12),
             ),
           ),
         ],
@@ -1410,7 +1202,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                       Expanded(
                         child: Text(
                           'كلما كان الوصف دقيقًا، ساعد ذلك في سرعة المعالجة',
-                          style: TextStyle(color: _photoSlate, fontSize: 11),
+                          style: TextStyle(color: _photoSlate, fontSize: 12),
                         ),
                       ),
                     ],
@@ -1513,78 +1305,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     );
   }
 
-  Widget _locationHeading() => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      const Text(
-        'الخطوة الثالثة',
-        style: TextStyle(
-          color: _photoTeal,
-          fontWeight: FontWeight.w800,
-          fontSize: 12,
-        ),
-      ),
-      const SizedBox(height: 9),
-      Row(
-        children: List.generate(
-          4,
-          (index) => Expanded(
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(end: 6),
-              child: SizedBox(
-                height: 11,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: index < 3 ? _photoTeal : const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    if (index == 2)
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: _photoGold,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0x66E5A93C),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 25),
-      const Text(
-        'حدد موقع المشكلة',
-        style: TextStyle(
-          color: _photoTeal,
-          fontSize: 25,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-      const SizedBox(height: 3),
-      const Text(
-        'اختر طريقة تحديد الموقع، ثم راجع موضع المؤشر على الخريطة.',
-        style: TextStyle(color: _photoSlate, fontSize: 12, height: 1.5),
-      ),
-    ],
-  );
-
   Widget _locationStep() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -1628,9 +1348,11 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   },
                 ),
                 children: [
-                  const MapLibreLayer(
-                    initStyle: 'https://tiles.openfreemap.org/styles/bright',
-                  ),
+                  widget.mapBackground?.call() ??
+                      const MapLibreLayer(
+                        initStyle:
+                            'https://tiles.openfreemap.org/styles/bright',
+                      ),
                   PolygonLayer(
                     polygons: [
                       Polygon(
@@ -1694,7 +1416,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: _photoTeal,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1761,7 +1483,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                             'موقعي',
                             style: TextStyle(
                               color: _photoTeal,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1833,37 +1555,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 11),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFAF9F6),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0x12000000)),
-              ),
-              child: Row(
-                children: [
-                  const Text(
-                    'الإحداثيات:',
-                    style: TextStyle(color: _photoSlate, fontSize: 11),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _formattedMapCenter(),
-                      textDirection: TextDirection.ltr,
-                      textAlign: TextAlign.end,
-                      style: const TextStyle(
-                        color: _photoTeal,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: _confirmMapCenter,
               icon: Icon(
@@ -1888,7 +1580,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 textStyle: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -1897,7 +1589,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
             const Text(
               'تأكد من موضع المؤشر؛ اسم الشارع قد يختلف عن الموقع الفعلي.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: _photoSlate, fontSize: 10),
+              style: TextStyle(color: _photoSlate, fontSize: 12),
             ),
           ],
         ),
@@ -1920,69 +1612,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       constraints: const BoxConstraints.tightFor(width: 38, height: 38),
       padding: EdgeInsets.zero,
     ),
-  );
-
-  Widget _reviewHeading() => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Row(
-        children: [
-          const CircleAvatar(radius: 3, backgroundColor: _photoGold),
-          const SizedBox(width: 7),
-          const Text(
-            'الخطوة الرابعة',
-            style: TextStyle(
-              color: _photoTeal,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAEFF1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              'اكتمال البيانات',
-              style: TextStyle(
-                color: _photoSlate,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 10),
-      Row(
-        children: List.generate(
-          4,
-          (index) => Expanded(
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(end: 7),
-              child: Container(
-                height: 6,
-                decoration: BoxDecoration(
-                  color: index == 3 ? _photoGold : _photoTeal,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 24),
-      const Text(
-        'راجع بلاغك',
-        style: TextStyle(
-          color: _photoTeal,
-          fontSize: 26,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    ],
   );
 
   Widget _reviewStep() => Column(
@@ -2038,7 +1667,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                     children: [
                       const Text(
                         'التصنيف المحدد',
-                        style: TextStyle(color: _photoSlate, fontSize: 11),
+                        style: TextStyle(color: _photoSlate, fontSize: 12),
                       ),
                       Text(
                         _category?.label ?? '',
@@ -2059,7 +1688,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 'الوصف',
                 style: TextStyle(
                   color: _photoSlate,
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -2099,11 +1728,12 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           minZoom: 5,
                           maxZoom: 18,
                         ),
-                        children: const [
-                          MapLibreLayer(
-                            initStyle:
-                                'https://tiles.openfreemap.org/styles/bright',
-                          ),
+                        children: [
+                          widget.mapBackground?.call() ??
+                              const MapLibreLayer(
+                                initStyle:
+                                    'https://tiles.openfreemap.org/styles/bright',
+                              ),
                         ],
                       ),
                     ),
@@ -2124,7 +1754,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           'الموقع المؤكد',
                           style: TextStyle(
                             color: _photoTeal,
-                            fontSize: 10,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -2305,80 +1935,69 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
   Widget _footer(bool completed) => _reportStepFooter(completed: completed);
 
-  Widget _reportStepFooter({required bool completed}) => ClipRect(
-    child: BackdropFilter(
-      filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(22, 13, 22, 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.75),
-          border: Border(
-            top: BorderSide(color: Colors.white.withValues(alpha: 0.9)),
-          ),
+  Widget _reportStepFooter({required bool completed}) => Container(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+    decoration: const BoxDecoration(
+      color: Color(0xF9FCF9F2),
+      border: Border(top: BorderSide(color: Color(0xFFEAE4D8))),
+    ),
+    child: Container(
+      height: 58,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFBBF24), _photoGold, Color(0xFFF59E0B)],
         ),
-        child: Container(
-          height: 58,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFBBF24), _photoGold, Color(0xFFF59E0B)],
-            ),
-            borderRadius: BorderRadius.circular(17),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x55E5A93C),
-                blurRadius: 21,
-                offset: Offset(0, 8),
-              ),
-            ],
+        borderRadius: BorderRadius.circular(17),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x55E5A93C),
+            blurRadius: 21,
+            offset: Offset(0, 8),
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _sending
-                  ? null
-                  : completed
-                  ? _back
-                  : _next,
-              borderRadius: BorderRadius.circular(17),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (_sending)
-                    const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: _photoTeal,
-                      ),
-                    )
-                  else ...[
-                    BalaghiButtonLabel(
-                      completed
-                          ? 'العودة إلى الخريطة'
-                          : switch (_step) {
-                              0 || 1 => 'التالي',
-                              2 => 'مراجعة البلاغ',
-                              _ => 'تأكيد',
-                            },
-                      style: const TextStyle(
-                        color: _photoTeal,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (!completed) ...[
-                      const SizedBox(width: 10),
-                      const Icon(
-                        Icons.west_rounded,
-                        color: _photoTeal,
-                        size: 22,
-                      ),
-                    ],
-                  ],
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _sending
+              ? null
+              : completed
+              ? _back
+              : _next,
+          borderRadius: BorderRadius.circular(17),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_sending)
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _photoTeal,
+                  ),
+                )
+              else ...[
+                BalaghiButtonLabel(
+                  completed
+                      ? 'العودة إلى الخريطة'
+                      : switch (_step) {
+                          0 || 1 => 'التالي',
+                          2 => 'مراجعة البلاغ',
+                          _ => 'إرسال البلاغ',
+                        },
+                  style: const TextStyle(
+                    color: _photoTeal,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (!completed) ...[
+                  const SizedBox(width: 10),
+                  const Icon(Icons.west_rounded, color: _photoTeal, size: 22),
                 ],
-              ),
-            ),
+              ],
+            ],
           ),
         ),
       ),
@@ -2402,46 +2021,6 @@ class _InfoBanner extends StatelessWidget {
       text,
       textAlign: TextAlign.center,
       style: const TextStyle(color: civicText, fontSize: 13),
-    ),
-  );
-}
-
-class _PhotoBrandPulse extends StatefulWidget {
-  const _PhotoBrandPulse();
-
-  @override
-  State<_PhotoBrandPulse> createState() => _PhotoBrandPulseState();
-}
-
-class _PhotoBrandPulseState extends State<_PhotoBrandPulse>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1600),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _controller,
-    builder: (context, child) => Container(
-      width: 8 + 2 * _controller.value,
-      height: 8 + 2 * _controller.value,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: _photoGold,
-        boxShadow: [
-          BoxShadow(
-            color: _photoGold.withValues(alpha: 0.18 + _controller.value * 0.3),
-            blurRadius: 5 + 8 * _controller.value,
-          ),
-        ],
-      ),
     ),
   );
 }

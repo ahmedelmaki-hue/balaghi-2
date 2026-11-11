@@ -274,7 +274,7 @@ class _AccountScreenState extends State<AccountScreen> {
   );
 
   Widget _header() => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
     child: SizedBox(
       height: 48,
       child: Stack(
@@ -284,12 +284,12 @@ class _AccountScreenState extends State<AccountScreen> {
             'حسابي',
             style: TextStyle(
               color: _ink,
-              fontSize: 23,
+              fontSize: 21,
               fontWeight: FontWeight.w800,
             ),
           ),
           Align(
-            alignment: Alignment.centerRight,
+            alignment: AlignmentDirectional.centerStart,
             child: BalaghiBackButton(
               onPressed: () => Navigator.of(context).pop(),
             ),
@@ -322,56 +322,51 @@ class _AccountScreenState extends State<AccountScreen> {
   );
 
   Widget _content() => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
     children: [
       _profileCard(),
-      const SizedBox(height: 20),
+      const SizedBox(height: 22),
       _sectionLabel('الحساب'),
-      _actionTile(
-        icon: Icons.edit_outlined,
-        title: 'تعديل الاسم',
-        subtitle: 'غيّر الاسم الظاهر في حسابك',
-        onTap: _editName,
-      ),
-      const SizedBox(height: 10),
-      _actionTile(
-        icon: Icons.assignment_outlined,
-        title: 'بلاغاتي',
-        subtitle: 'تابع بلاغاتك وحالة معالجتها',
-        onTap: _openMyReports,
-      ),
-      const SizedBox(height: 20),
+      _group([
+        _actionTile(
+          icon: Icons.edit_outlined,
+          title: 'تعديل الاسم',
+          subtitle: 'غيّر الاسم الظاهر في حسابك',
+          onTap: _editName,
+        ),
+        _actionTile(
+          icon: Icons.assignment_outlined,
+          title: 'بلاغاتي',
+          subtitle: 'تابع بلاغاتك وحالة معالجتها',
+          onTap: _openMyReports,
+        ),
+      ]),
+      const SizedBox(height: 22),
       _sectionLabel('التطبيق'),
-      _appearanceTile(),
-      const SizedBox(height: 10),
-      _actionTile(
-        icon: Icons.privacy_tip_outlined,
-        title: 'سياسة الخصوصية',
-        subtitle: 'كيف تُستخدم بياناتك وبيانات البلاغات',
-        onTap: () => Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) => _PrivacyScreen(previewMode: widget.previewMode),
+      _group([
+        _appearanceTile(),
+        _actionTile(
+          icon: Icons.privacy_tip_outlined,
+          title: 'سياسة الخصوصية',
+          subtitle: 'كيف تُستخدم بياناتك وبيانات البلاغات',
+          onTap: () => Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => _PrivacyScreen(previewMode: widget.previewMode),
+            ),
           ),
         ),
-      ),
-      const SizedBox(height: 18),
-      Center(
-        child: Text(
-          _version == null ? 'بلاغي' : 'بلاغي  •  الإصدار $_version',
-          style: TextStyle(color: _muted.withValues(alpha: 0.85), fontSize: 12),
-        ),
-      ),
-      const SizedBox(height: 28),
+      ]),
+      const SizedBox(height: 26),
       OutlinedButton.icon(
         onPressed: _busy ? null : _signOut,
         icon: const Icon(Icons.logout_rounded, size: 20),
         label: const BalaghiButtonLabel(
           'تسجيل الخروج',
-          style: TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
         style: OutlinedButton.styleFrom(
           foregroundColor: const Color(0xFFC93636),
-          side: const BorderSide(color: Color(0x33C93636)),
+          side: const BorderSide(color: Color(0x40C93636)),
           backgroundColor: Colors.white,
           minimumSize: const Size.fromHeight(54),
           shape: RoundedRectangleBorder(
@@ -379,158 +374,173 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
         ),
       ),
+      const SizedBox(height: 16),
+      Center(
+        child: Text(
+          _version == null ? 'بلاغي' : 'بلاغي  •  الإصدار $_version',
+          style: const TextStyle(color: _muted, fontSize: 12.5),
+        ),
+      ),
     ],
   );
 
+  /// "+218912345678" as a Libyan reads it: 0912345678.
+  String get _localPhone {
+    final phone = _phone;
+    if (phone == null) return 'غير متاح';
+    return phone.startsWith('+218') ? '0${phone.substring(4)}' : phone;
+  }
+
   Widget _profileCard() => Container(
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: Colors.white,
       border: Border.all(color: _border),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(20),
       boxShadow: const [
         BoxShadow(
-          color: Color(0x1012323F),
-          blurRadius: 18,
-          offset: Offset(0, 6),
+          color: Color(0x0F12323F),
+          blurRadius: 16,
+          offset: Offset(0, 5),
         ),
       ],
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    child: Row(
       children: [
-        Center(
-          child: Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              color: _gold.withValues(alpha: 0.19),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.person_rounded, color: _ink, size: 40),
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: _gold.withValues(alpha: 0.18),
+            shape: BoxShape.circle,
           ),
+          child: const Icon(Icons.person_rounded, color: _ink, size: 32),
         ),
-        const SizedBox(height: 14),
-        Text(
-          _name?.trim().isNotEmpty == true ? _name! : 'الاسم غير متاح',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: _ink,
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        if (widget.previewMode) ...[
-          const SizedBox(height: 8),
-          Center(child: _previewBadge()),
-        ],
-        const SizedBox(height: 18),
-        const Divider(color: _border, height: 1),
-        const SizedBox(height: 16),
-        const Text('رقم الهاتف', style: TextStyle(color: _muted, fontSize: 12)),
-        const SizedBox(height: 5),
-        Row(
-          children: [
-            const Icon(Icons.phone_android_rounded, color: _ink, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                _phone ?? 'غير محفوظ في المعاينة السابقة',
-                textDirection: TextDirection.ltr,
-                textAlign: TextAlign.right,
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _name?.trim().isNotEmpty == true ? _name! : 'الاسم غير متاح',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: _ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  height: 1.35,
                 ),
               ),
-            ),
-            const Icon(Icons.lock_outline_rounded, color: _muted, size: 17),
-          ],
-        ),
-        const SizedBox(height: 7),
-        const Text(
-          'تغيير الرقم يتطلب التحقق برمز OTP جديد.',
-          style: TextStyle(color: _muted, fontSize: 11),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.phone_android_rounded,
+                    color: _muted,
+                    size: 17,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    _localPhone,
+                    textDirection: TextDirection.ltr,
+                    style: const TextStyle(
+                      color: _muted,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
-    ),
-  );
-
-  Widget _previewBadge() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-    decoration: BoxDecoration(
-      color: _gold.withValues(alpha: 0.17),
-      borderRadius: BorderRadius.circular(30),
-    ),
-    child: const Text(
-      'وضع المعاينة',
-      style: TextStyle(color: _ink, fontSize: 11, fontWeight: FontWeight.w700),
     ),
   );
 
   Widget _sectionLabel(String label) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
     child: Text(
       label,
       style: const TextStyle(
-        color: _ink,
-        fontSize: 14,
+        color: _muted,
+        fontSize: 13.5,
         fontWeight: FontWeight.w800,
       ),
     ),
   );
 
+  /// The rows of one section inside a single card, divided by thin lines.
+  Widget _group(List<Widget> rows) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: _border),
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(17),
+      child: Column(
+        children: [
+          for (final (index, row) in rows.indexed) ...[
+            if (index > 0)
+              const Divider(
+                height: 1,
+                thickness: 1,
+                indent: 66,
+                color: _border,
+              ),
+            row,
+          ],
+        ],
+      ),
+    ),
+  );
+
+  Widget _tileIcon(IconData icon) => Container(
+    width: 40,
+    height: 40,
+    decoration: BoxDecoration(
+      color: _gold.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Icon(icon, color: _ink, size: 21),
+  );
+
+  Widget _tileText(String title, String subtitle) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      BalaghiButtonLabel(
+        title,
+        style: const TextStyle(
+          color: _ink,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(subtitle, style: const TextStyle(color: _muted, fontSize: 12.5)),
+    ],
+  );
+
   Widget _appearanceTile() => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(17),
+    color: Colors.transparent,
     child: InkWell(
       onTap: _busy || _savingAppearance
           ? null
           : () => _setDarkWelcome(!_darkWelcome),
-      borderRadius: BorderRadius.circular(17),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border.all(color: _border),
-          borderRadius: BorderRadius.circular(17),
-        ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(14, 10, 8, 10),
         child: Row(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: _gold.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: Icon(
-                _darkWelcome
-                    ? Icons.dark_mode_rounded
-                    : Icons.light_mode_rounded,
-                color: _ink,
-                size: 22,
-              ),
+            _tileIcon(
+              _darkWelcome ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
             ),
             const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  BalaghiButtonLabel(
-                    'الوضع الداكن لشاشة الدخول',
-                    style: TextStyle(
-                      color: _ink,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  SizedBox(height: 3),
-                  Text(
-                    'يغيّر شاشة «المتابعة برقم الهاتف» فقط',
-                    style: TextStyle(color: _muted, fontSize: 11),
-                  ),
-                ],
+            Expanded(
+              child: _tileText(
+                'الوضع الداكن لشاشة الدخول',
+                'يغيّر شاشة «المتابعة برقم الهاتف» فقط',
               ),
             ),
             Switch(
@@ -551,49 +561,16 @@ class _AccountScreenState extends State<AccountScreen> {
     required String subtitle,
     required VoidCallback onTap,
   }) => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(17),
+    color: Colors.transparent,
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(17),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-        decoration: BoxDecoration(
-          border: Border.all(color: _border),
-          borderRadius: BorderRadius.circular(17),
-        ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(14, 13, 10, 13),
         child: Row(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: _gold.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: Icon(icon, color: _ink, size: 22),
-            ),
+            _tileIcon(icon),
             const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  BalaghiButtonLabel(
-                    title,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: _muted, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
+            Expanded(child: _tileText(title, subtitle)),
             const Icon(Icons.chevron_left_rounded, color: _muted, size: 22),
           ],
         ),
@@ -613,89 +590,145 @@ class _PrivacyScreen extends StatelessWidget {
     textDirection: TextDirection.rtl,
     child: Scaffold(
       backgroundColor: _background,
-      appBar: AppBar(
-        backgroundColor: _background,
-        centerTitle: true,
-        title: const Text(
-          'سياسة الخصوصية',
-          style: TextStyle(color: _ink, fontWeight: FontWeight.w800),
-        ),
-        leading: IconButton(
-          tooltip: 'رجوع',
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(
-            Icons.chevron_right_rounded,
-            textDirection: TextDirection.ltr,
-            color: _ink,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0, 0.38, 1],
+            colors: [Color(0xFFFEF3C7), _background, _background],
           ),
         ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(22),
-        children: [
-          const _PrivacySection(
-            title: 'بيانات الحساب',
-            body:
-                'يُستخدم رقم هاتفك للتحقق من الدخول برمز OTP. يُحفظ اسمك ورقم هاتفك في ملف الحساب لربط البلاغات بك.',
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: SizedBox(
+                  height: 48,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Text(
+                        'سياسة الخصوصية',
+                        style: TextStyle(
+                          color: _ink,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: BalaghiBackButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                  children: [
+                    const _PrivacySection(
+                      icon: Icons.person_outline_rounded,
+                      title: 'بيانات الحساب',
+                      body:
+                          'يُستخدم رقم هاتفك للتحقق من الدخول برمز OTP. يُحفظ اسمك ورقم هاتفك في ملف الحساب لربط البلاغات بك.',
+                    ),
+                    const _PrivacySection(
+                      icon: Icons.photo_camera_outlined,
+                      title: 'بيانات البلاغ',
+                      body:
+                          'عند إرسال بلاغ، تُحفظ الصورة والتصنيف والوصف والموقع الذي أكدته، وتُزال من الصورة بياناتها المخفية مثل مكان التصوير. يراجع موظف البلدية البلاغ أولًا، وبعد اعتماده تظهر صورته ووصفه وموقعه وحالته على الخريطة العامة.',
+                    ),
+                    const _PrivacySection(
+                      icon: Icons.image_search_rounded,
+                      title: 'فحص الصورة آليًا',
+                      body:
+                          'بعد الإرسال تُفحص صورة البلاغ آليًا عبر خدمة Claude من شركة Anthropic، لتساعد الموظف في التأكد من نوع المشكلة. تُرسل الصورة وحدها، دون اسمك أو رقم هاتفك أو موقع البلاغ. نتيجة الفحص اقتراح يراه الموظف فقط، والقرار له.',
+                    ),
+                    const _PrivacySection(
+                      icon: Icons.visibility_outlined,
+                      title: 'من يرى بياناتك؟',
+                      body:
+                          'لا يظهر اسمك أو رقم هاتفك في البلاغ العام، ولا يراهما العامل الميداني الذي ينفّذ الإصلاح. يطّلع عليهما موظفو البلدية المختصون فقط، لمراجعة البلاغ ومتابعته.',
+                    ),
+                    if (previewMode)
+                      const _PrivacySection(
+                        icon: Icons.science_outlined,
+                        title: 'وضع المعاينة',
+                        body:
+                            'البلاغات التجريبية في وضع المعاينة لا تُرسل إلى البلدية. تُحفظ بيانات معاينة الدخول محليًا على جهازك ويمكن مسحها بتسجيل الخروج.',
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const _PrivacySection(
-            title: 'بيانات البلاغ',
-            body:
-                'عند إرسال بلاغ، تُحفظ الصورة والتصنيف والوصف والموقع الذي أكدته، وتُزال من الصورة بياناتها المخفية مثل مكان التصوير. يراجع موظف البلدية البلاغ أولًا، وبعد اعتماده تظهر صورته ووصفه وموقعه وحالته على الخريطة العامة.',
-          ),
-          const _PrivacySection(
-            title: 'فحص الصورة آليًا',
-            body:
-                'بعد الإرسال تُفحص صورة البلاغ آليًا عبر خدمة Claude من شركة Anthropic، لتساعد الموظف في التأكد من نوع المشكلة. تُرسل الصورة وحدها، دون اسمك أو رقم هاتفك أو موقع البلاغ. نتيجة الفحص اقتراح يراه الموظف فقط، والقرار له.',
-          ),
-          const _PrivacySection(
-            title: 'من يرى بياناتك؟',
-            body:
-                'لا يظهر اسمك أو رقم هاتفك في البلاغ العام، ولا يراهما العامل الميداني الذي ينفّذ الإصلاح. يطّلع عليهما موظفو البلدية المختصون فقط، لمراجعة البلاغ ومتابعته.',
-          ),
-          if (previewMode)
-            const _PrivacySection(
-              title: 'وضع المعاينة',
-              body:
-                  'البلاغات التجريبية في وضع المعاينة لا تُرسل إلى البلدية. تُحفظ بيانات معاينة الدخول محليًا على جهازك ويمكن مسحها بتسجيل الخروج.',
-            ),
-        ],
+        ),
       ),
     ),
   );
 }
 
 class _PrivacySection extends StatelessWidget {
-  const _PrivacySection({required this.title, required this.body});
+  const _PrivacySection({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
 
+  final IconData icon;
   final String title;
   final String body;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 13),
+    padding: const EdgeInsets.only(bottom: 12),
     child: Container(
-      padding: const EdgeInsets.all(17),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: _border),
-        borderRadius: BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: _ink,
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: _gold.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: _ink, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: _ink,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             body,
-            style: const TextStyle(color: _muted, fontSize: 13, height: 1.55),
+            style: const TextStyle(
+              color: Color(0xFF3F5258),
+              fontSize: 14,
+              height: 1.7,
+            ),
           ),
         ],
       ),
