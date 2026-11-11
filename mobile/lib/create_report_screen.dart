@@ -13,6 +13,7 @@ import 'app_config.dart';
 import 'citizen_auth.dart';
 import 'create_report_repository.dart';
 import 'pending_reports.dart';
+import 'photo_brightness.dart';
 import 'public_reports.dart';
 import 'report_ui.dart';
 
@@ -102,6 +103,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   int _step = 0;
   Uint8List? _photo;
   String? _photoMimeType;
+  // A photo taken in near darkness: the citizen is told, and may keep it.
+  bool _photoTooDark = false;
+  int _photoCheckSerial = 0;
   ReportCategory? _category;
   LatLng? _location;
   LatLng _mapCenter = _tripoli;
@@ -189,7 +193,13 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         setState(() {
           _photo = bytes;
           _photoMimeType = isPng ? 'image/png' : 'image/jpeg';
+          _photoTooDark = false;
         });
+      }
+      final serial = ++_photoCheckSerial;
+      final tooDark = await isPhotoTooDark(bytes);
+      if (mounted && serial == _photoCheckSerial && tooDark) {
+        setState(() => _photoTooDark = true);
       }
     } catch (_) {
       _message('تعذّر قراءة الصورة. أعد التصوير.');
@@ -870,27 +880,115 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         onTap: _capturePhoto,
       ),
       const SizedBox(height: 18),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.68),
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: Colors.white),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.tips_and_updates_outlined, size: 18, color: _photoTeal),
-            SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                'التقط صورة مباشرة بالكاميرا وتأكد من ظهور المشكلة كاملة.',
-                style: TextStyle(color: _muted, fontSize: 12),
+      if (_photoTooDark)
+        _darkPhotoWarning()
+      else
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.68),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: Colors.white),
+          ),
+          child: const Row(
+            children: [
+              Icon(
+                Icons.tips_and_updates_outlined,
+                size: 18,
+                color: _photoTeal,
               ),
-            ),
-          ],
+              SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'التقط صورة مباشرة بالكاميرا وتأكد من ظهور المشكلة كاملة.',
+                  style: TextStyle(color: _muted, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
     ],
+  );
+
+  /// Shown under a photo taken in near darkness. It only advises: the citizen
+  /// can retake it with the button above or keep it and carry on.
+  Widget _darkPhotoWarning() => Semantics(
+    liveRegion: true,
+    child: Container(
+      padding: const EdgeInsetsDirectional.fromSTEB(13, 8, 6, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF0D59C)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            margin: const EdgeInsets.only(top: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFDEFCF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.nights_stay_outlined,
+              size: 19,
+              color: Color(0xFF9A6700),
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'الصورة مظلمة',
+                        style: TextStyle(
+                          color: Color(0xFF7A5408),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => _photoTooDark = false),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _photoTeal,
+                        minimumSize: const Size(48, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                      ),
+                      child: const BalaghiButtonLabel(
+                        'استخدامها كما هي',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsetsDirectional.only(end: 8),
+                  child: Text(
+                    'قد لا تظهر المشكلة فيها بوضوح. أعد التصوير في إضاءة أفضل أو شغّل الفلاش.',
+                    style: TextStyle(
+                      color: Color(0xFF5E4B23),
+                      fontSize: 12,
+                      height: 1.55,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
   );
 
   Widget _photoViewfinder() => Container(
