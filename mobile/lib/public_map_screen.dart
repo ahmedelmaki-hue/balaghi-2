@@ -55,6 +55,9 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
   // Zoom in half steps: clusters are rebuilt only when this changes.
   double _clusterZoom = 13.5;
   bool _loading = false;
+  // True once a load has taken long enough to explain the wait.
+  bool _slowLoad = false;
+  Timer? _slowTimer;
   int _requestSerial = 0;
   int _selectionSerial = 0;
   int _locationSerial = 0;
@@ -90,6 +93,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
   void dispose() {
     _lifecycle?.dispose();
     _refreshTimer?.cancel();
+    _slowTimer?.cancel();
     _reportSender.dispose();
     _myReports.dispose();
     _repository.dispose();
@@ -118,15 +122,23 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
       _loading = true;
       _loadError = null;
     });
+    _slowTimer?.cancel();
+    _slowTimer = Timer(slowServerHint, () {
+      if (mounted && serial == _requestSerial && _loading) {
+        setState(() => _slowLoad = true);
+      }
+    });
     try {
       final reports = await _repository.fetchMarkers(
         _mapController.camera.visibleBounds,
         category: _category,
       );
       if (!mounted || serial != _requestSerial) return;
+      _slowTimer?.cancel();
       setState(() {
         _markers = reports;
         _loading = false;
+        _slowLoad = false;
         if (_selectedReport != null &&
             !reports.any((report) => report.id == _selectedReport!.id)) {
           _selectedReport = null;
@@ -134,9 +146,12 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
       });
     } catch (_) {
       if (!mounted || serial != _requestSerial) return;
+      _slowTimer?.cancel();
       setState(() {
         _loading = false;
-        _loadError = 'تعذر تحميل البلاغات. تحقق من اتصال الخادم.';
+        _slowLoad = false;
+        _loadError =
+            'تعذّر تحميل البلاغات. تحقق من اتصالك بالإنترنت ثم حاول مجددًا.';
       });
     }
   }
@@ -791,6 +806,21 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
           right: 0,
           top: 127,
           child: LinearProgressIndicator(color: _homeGold, minHeight: 3),
+        ),
+      if (_slowLoad && _loading && _loadError == null)
+        Positioned(
+          top: 188,
+          right: 12,
+          left: 75,
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            elevation: 3,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Text(slowServerMessage, style: TextStyle(fontSize: 12)),
+            ),
+          ),
         ),
       if (_loadError != null)
         Positioned(

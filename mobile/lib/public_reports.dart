@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+import 'app_config.dart';
 import 'report_image_url.dart';
 
 enum ReportCategory {
@@ -136,9 +137,7 @@ class PublicReportsRepository {
       final uri = Uri.parse(
         '$_baseUrl/reports/public',
       ).replace(queryParameters: query);
-      final response = await _client
-          .get(uri)
-          .timeout(const Duration(seconds: 12));
+      final response = await _client.get(uri).timeout(serverTimeout);
       if (response.statusCode != 200) {
         throw Exception('تعذر تحميل البلاغات (${response.statusCode})');
       }
@@ -162,9 +161,7 @@ class PublicReportsRepository {
 
   Future<PublicReport> fetchDetail(String id) async {
     final uri = Uri.parse('$_baseUrl/reports/$id/public');
-    final response = await _client
-        .get(uri)
-        .timeout(const Duration(seconds: 12));
+    final response = await _client.get(uri).timeout(serverTimeout);
     if (response.statusCode != 200) {
       throw Exception('تعذر تحميل تفاصيل البلاغ (${response.statusCode})');
     }

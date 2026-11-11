@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'app_config.dart';
 import 'citizen_auth.dart';
 import 'public_reports.dart';
 import 'report_image_url.dart';
@@ -63,7 +64,7 @@ class CreateReportRepository {
     http.Response response;
     try {
       response = await http.Response.fromStream(
-        await _client.send(request).timeout(const Duration(seconds: 30)),
+        await _client.send(request).timeout(serverTimeout),
       );
     } catch (_) {
       throw const CreateReportFailure(

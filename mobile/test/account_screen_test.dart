@@ -7,6 +7,7 @@ import 'package:balaghi/welcome_appearance_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -82,7 +83,7 @@ void main() {
   });
 
   testWidgets(
-    'the privacy policy explains the photo check, and preview notes stay out of a real build',
+    'the version comes from the app; the privacy policy explains the photo check, without preview notes',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       FlutterSecureStorage.setMockInitialValues({
@@ -103,10 +104,27 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
+      PackageInfo.setMockInitialValues(
+        appName: 'بلاغي',
+        packageName: 'com.example.balaghi',
+        version: '1.2.3',
+        buildNumber: '4',
+        buildSignature: '',
+      );
       await tester.pumpWidget(
         const MaterialApp(home: AccountScreen(previewMode: false)),
       );
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('بلاغي  •  الإصدار 1.2.3'),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(
+        find.text('بلاغي  •  الإصدار 1.2.3'),
+        findsOneWidget,
+        reason: 'the version comes from the installed app, not a fixed text',
+      );
       await tester.scrollUntilVisible(
         find.text('سياسة الخصوصية'),
         300,

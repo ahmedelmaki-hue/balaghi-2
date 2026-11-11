@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'app_config.dart';
 import 'citizen_auth.dart';
@@ -34,11 +35,23 @@ class _AccountScreenState extends State<AccountScreen> {
   bool _busy = false;
   bool _darkWelcome = false;
   bool _savingAppearance = false;
+  // From the installed app (pubspec.yaml's version), so it never goes stale.
+  String? _version;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _version = info.version);
+    } catch (_) {
+      // Without it the footer shows the app name alone.
+    }
   }
 
   @override
@@ -344,7 +357,7 @@ class _AccountScreenState extends State<AccountScreen> {
       const SizedBox(height: 18),
       Center(
         child: Text(
-          'بلاغي  •  الإصدار 1.0.0',
+          _version == null ? 'بلاغي' : 'بلاغي  •  الإصدار $_version',
           style: TextStyle(color: _muted.withValues(alpha: 0.85), fontSize: 12),
         ),
       ),

@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import 'app_config.dart';
+
 class AuthFailure implements Exception {
   const AuthFailure(this.message, {this.network = false, this.status});
   final String message;
@@ -154,7 +156,7 @@ class CitizenAuthApi {
             },
             body: jsonEncode(body),
           )
-          .timeout(const Duration(seconds: 12));
+          .timeout(serverTimeout);
     } catch (_) {
       throw const AuthFailure(
         'تعذر الاتصال بالخادم. تحقق من الشبكة ثم حاول مجددًا.',
@@ -217,7 +219,7 @@ class CitizenAuthApi {
             },
             body: jsonEncode({'full_name': fullName}),
           )
-          .timeout(const Duration(seconds: 12));
+          .timeout(serverTimeout);
     } catch (_) {
       throw const AuthFailure(
         'تعذر الاتصال بالخادم. تحقق من الشبكة ثم حاول مجددًا.',

@@ -46,6 +46,9 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
   String? _phone;
   String? _error;
   bool _busy = false;
+  // True once a request has waited long enough to explain why.
+  bool _slowWait = false;
+  Timer? _slowTimer;
   bool _verified = false;
   bool _darkWelcome = false;
   int _resendSeconds = 0;
@@ -70,6 +73,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
   @override
   void dispose() {
     _resendTimer?.cancel();
+    _slowTimer?.cancel();
     _api.dispose();
     _phoneController.dispose();
     _codeController.dispose();
@@ -123,6 +127,23 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
     });
   }
 
+  /// A sleeping server can take up to a minute to answer; past a few seconds
+  /// the screen says so instead of looking stuck.
+  void _watchSlowServer() {
+    _slowTimer?.cancel();
+    _slowTimer = Timer(slowServerHint, () {
+      if (mounted && _busy) setState(() => _slowWait = true);
+    });
+  }
+
+  void _endBusy() {
+    _slowTimer?.cancel();
+    setState(() {
+      _busy = false;
+      _slowWait = false;
+    });
+  }
+
   Future<void> _sendCode() async {
     final phone = normalizeLibyanMobile(_phoneController.text);
     if (phone == null) {
@@ -133,6 +154,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       _busy = true;
       _error = null;
     });
+    _watchSlowServer();
     try {
       if (!widget.previewMode) await _api.sendOtp(phone);
       if (!mounted) return;
@@ -144,7 +166,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
     } on AuthFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) _endBusy();
     }
   }
 
@@ -154,6 +176,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       _busy = true;
       _error = null;
     });
+    _watchSlowServer();
     try {
       if (!widget.previewMode) await _api.sendOtp(_phone!);
       if (!mounted) return;
@@ -170,7 +193,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
     } on AuthFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) _endBusy();
     }
   }
 
@@ -189,6 +212,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       _busy = true;
       _error = null;
     });
+    _watchSlowServer();
     try {
       if (widget.previewMode) {
         await _showVerifiedAnimation();
@@ -213,7 +237,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
         setState(() => _error = 'تعذر حفظ جلسة الدخول. حاول مجددًا.');
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) _endBusy();
     }
   }
 
@@ -234,6 +258,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
       _busy = true;
       _error = null;
     });
+    _watchSlowServer();
     try {
       if (widget.previewMode) {
         await _previewStore.markCompleted(
@@ -257,7 +282,7 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) _endBusy();
     }
   }
 
@@ -309,6 +334,17 @@ class _CitizenAuthScreenState extends State<CitizenAuthScreen> {
                           style: const TextStyle(
                             color: Color(0xFFC93636),
                             fontSize: 13,
+                          ),
+                        ),
+                      ],
+                      if (_busy && _slowWait && !widget.previewMode) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          slowServerMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _showDarkWelcome ? _welcomeMuted : _muted,
+                            fontSize: 12,
                           ),
                         ),
                       ],

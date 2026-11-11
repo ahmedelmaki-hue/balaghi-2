@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+import 'app_config.dart';
 import 'citizen_auth.dart';
 import 'public_reports.dart';
 import 'report_image_url.dart';
@@ -145,7 +146,7 @@ class MyReportsRepository {
     try {
       response = await _client
           .get(uri, headers: {'authorization': 'Bearer ${session.accessToken}'})
-          .timeout(const Duration(seconds: 12));
+          .timeout(serverTimeout);
     } catch (_) {
       throw const MyReportsFailure(
         'تعذّر تحميل بلاغاتك. تحقق من اتصالك وحاول مجددًا.',
